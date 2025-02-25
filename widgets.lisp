@@ -1,3 +1,41 @@
 (in-package #:gauthali)
 
+(deftype anchor-x ()
+  `(member :left :center :right))
+(deftype anchor-y ()
+  `(member :top :center :bottom))
+(deftype anchor ()
+  `(cons anchor-x anchor-y))
 
+(defun anchor-translate (anchor x y w h)
+  "Get coordiate of top left corner if given `x',`y' are coordinates of `anchor'."
+  (values (ecase (car anchor)
+	    (:left x)
+	    (:center (- x (* 0.5 w)))
+	    (:right (- x w)))
+	  (ecase (cdr anchor)
+	    (:top y)
+	    (:center (- y (* 0.5 h)))
+	    (:bottom (- y h)))))
+
+(defun draw-text (app text &key width font-size color x y (anchor '(:left . :top)))
+  (declare (type fixnum width)
+	   (type float x y)
+	   (type anchor anchor)
+	   (type sdl3:color color))
+  (when font-size
+    (sdl3-ttf:set-font-size (font app) font-size))
+  (cffi:with-foreign-string ((str bytes) text)
+    (let* ((ttf-text (sdl3-ttf:create-text (text-engine app) (font app) str bytes)))
+      (sdl3-ttf:set-text-wrap-width ttf-text (or width 0))
+      (when color
+	(sdl3-ttf:set-text-color ttf-text
+				 (slot-value color 'sdl3:%r)
+				 (slot-value color 'sdl3:%g)
+				 (slot-value color 'sdl3:%b)
+				 (slot-value color 'sdl3:%a)))
+      (multiple-value-bind (ret w h) (sdl3-ttf:get-text-size ttf-text)
+	(assert-ret ret)
+	(multiple-value-bind (x y) (anchor-translate anchor x y w h)
+	  (sdl3-ttf:draw-renderer-text ttf-text x y)))
+      (sdl3-ttf:destroy-text ttf-text))))

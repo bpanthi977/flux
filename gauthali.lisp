@@ -7,9 +7,10 @@
 (defclass app ()
   ((window :initarg :window :accessor window)
    (renderer :initarg :renderer :accessor renderer)
-   (frame-rate :initform 1000/60 :accessor frame-rate)
-   (font :initarg :font :accessor font)))
-
+   (frame-rate :initform 1/60 :accessor frame-rate)
+   (font :initarg :font :accessor font)
+   (text-engine :initarg :text-engine :accessor text-engine)
+   (last-frame :initform (get-internal-real-time) :accessor last-frame)))
 
 (defun init ()
   (assert-ret (sdl3:set-app-metadata "Gauthali" "1.0" "com.bpanthi.gauthali"))
@@ -21,17 +22,47 @@
        400 400
        nil)
     (assert-ret ret)
-    (make-instance 'app
-		   :window window
-		   :renderer renderer)))
+    (assert-ret (sdl3-ttf:init))
+    (let ((font (sdl3-ttf:open-font (namestring (get-resource-path "res/fonts/Times New Roman.ttf")) 18.0))
+	  (text-engine (sdl3-ttf:create-renderer-text-engine renderer)))
+      (assert-ret (not (cffi:null-pointer-p font)))
+      (assert-ret (not (cffi:null-pointer-p text-engine)))
+      (make-instance 'app
+		     :window window
+		     :renderer renderer
+		     :font font
+		     :text-engine text-engine))))
+
 
 (defun render (app)
-  (declare (ignore app)))
+  (let ((r (renderer app)))
+    (multiple-value-bind (ret w h) (sdl3:get-window-size (window app))
+      (assert-ret ret)
+      (sdl3:set-render-draw-color r 255 255 255 255)
+      (sdl3:render-clear r)
+      (let ((fps (/ internal-time-units-per-second
+		    (- (get-internal-real-time) (last-frame app)))))
+	(setf (last-frame app) (get-internal-real-time))
+	(draw-text app
+		   (format nil "FPS: ~,3f [~,3f]" fps (/ (frame-rate app)))
+		   :font-size 18.0
+		   :color (color 0 0 0 255)
+		   :x (coerce w 'float) :y 0.0
+		   :width 0
+		   :anchor '(:right . :top)))
+      (draw-text app "Gauthali"
+		 :font-size 40.0
+		 :color (color 0 0 0 255)
+		 :x (* 0.5 w) :y (* 0.5 h)
+		 :width 0
+		 :anchor '(:center . :center))
+
+      (sdl3:render-present r))))
 
 (defun handle-event (app event)
   (declare (ignorable app event))
   (typecase event
-    (sdl3:keyboard-event 
+    (sdl3:keyboard-event
      (case (slot-value event 'sdl3:%scancode)
        (:q nil)
        (t t)))
@@ -40,6 +71,8 @@
 (defun handle-quit (app)
   (sdl3:destroy-renderer (renderer app))
   (sdl3:destroy-window (window app))
+  (sdl3-ttf:close-font (font app))
+  (sdl3-ttf:quit)
   (sdl3:pump-events)
   (sdl3:quit-sub-system :video)
   (sdl3:quit))
@@ -50,11 +83,12 @@
     (setf *app* app)
     (unwind-protect
 	 (loop named outer do
-           (loop named event-loop
-                 for event = (sdl3:poll-event*)
-                 while event
-                 do
-                    (unless (handle-event app event)
+	   (loop named event-loop
+		 for event = (sdl3:poll-event*)
+		 while event
+		 do
+		    (print event)
+		    (unless (handle-event app event)
 		      (return-from outer)))
 	   (let ((render-time-diff (/ (- (get-internal-real-time) last-frame-update)
 				      internal-time-units-per-second)))
@@ -69,7 +103,7 @@
   (progn
     (trivial-main-thread:with-body-in-main-thread (:blocking t)
       (float-features:with-float-traps-masked t
-        (run-app))))
+	(run-app))))
   #-darwin
   (run-app))
 (export 'start-app)
