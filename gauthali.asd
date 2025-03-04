@@ -10,4 +10,6 @@
   :components ((:file "package")
 	       (:file "utils")
 	       (:file "widgets")
+	       (:file "layout")
+	       (:file "element")
                (:file "gauthali")))

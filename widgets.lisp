@@ -39,3 +39,28 @@
 	(multiple-value-bind (x y) (anchor-translate anchor x y w h)
 	  (sdl3-ttf:draw-renderer-text ttf-text x y)))
       (sdl3-ttf:destroy-text ttf-text))))
+
+(defun draw-rectangle (app &key width height x y color)
+  (declare (type float x y width height)
+	   (type (or null sdl3:color) color))
+  (when color
+    (sdl3:set-render-draw-color (renderer app)
+				(slot-value color 'sdl3:%r)
+				(slot-value color 'sdl3:%g)
+				(slot-value color 'sdl3:%b)
+				(slot-value color 'sdl3:%a)))
+  (sdl3:render-fill-rect (renderer app) (make-instance 'sdl3:frect :%x x :%y y :%w width :%h height)))
+
+(defun draw-rectangle-frame (app &key width height x y color)
+  (declare (type float x y width height)
+	   (type (or null sdl3:color) color))
+  (when color
+    (sdl3:set-render-draw-color (renderer app)
+				(slot-value color 'sdl3:%r)
+				(slot-value color 'sdl3:%g)
+				(slot-value color 'sdl3:%b)
+				(slot-value color 'sdl3:%a)))
+  (sdl3:render-rect (renderer app) (make-instance 'sdl3:frect :%x x :%y y :%w width :%h height)))
+
+(defun draw-nothing (app &key width height x y)
+  (declare (ignore app width height x y)))
