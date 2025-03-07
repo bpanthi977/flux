@@ -1,10 +1,8 @@
 (in-package #:gauthali)
 
-(defun create-text-element (app text &key width font-size color)
-  (when font-size
-    (sdl3-ttf:set-font-size (font app) font-size))
+(defun create-text-element (text-engine text &key width color font)
   (cffi:with-foreign-string ((str bytes) text)
-    (let* ((ttf-text (sdl3-ttf:create-text (text-engine app) (font app) str bytes)))
+    (let* ((ttf-text (sdl3-ttf:create-text text-engine font str bytes)))
       (sdl3-ttf:set-text-wrap-width ttf-text (or width 0))
       (multiple-value-bind (ret w h) (sdl3-ttf:get-text-size ttf-text)
 	(assert-ret ret)
@@ -23,27 +21,27 @@
 	  (trivial-garbage:finalize el (lambda () (sdl3-ttf:destroy-text ttf-text)))
 	  el)))))
 
-(defun draw-rectangle (app &key width height x y color)
+(defun draw-rectangle (renderer &key width height x y color)
   (declare (type float x y width height)
 	   (type (or null sdl3:color) color))
   (when color
-    (sdl3:set-render-draw-color (renderer app)
+    (sdl3:set-render-draw-color renderer
 				(slot-value color 'sdl3:%r)
 				(slot-value color 'sdl3:%g)
 				(slot-value color 'sdl3:%b)
 				(slot-value color 'sdl3:%a)))
-  (sdl3:render-fill-rect (renderer app) (make-instance 'sdl3:frect :%x x :%y y :%w width :%h height)))
+  (sdl3:render-fill-rect renderer (make-instance 'sdl3:frect :%x x :%y y :%w width :%h height)))
 
-(defun draw-rectangle-frame (app &key width height x y color)
+(defun draw-rectangle-frame (renderer &key width height x y color)
   (declare (type float x y width height)
 	   (type (or null sdl3:color) color))
   (when color
-    (sdl3:set-render-draw-color (renderer app)
+    (sdl3:set-render-draw-color renderer
 				(slot-value color 'sdl3:%r)
 				(slot-value color 'sdl3:%g)
 				(slot-value color 'sdl3:%b)
 				(slot-value color 'sdl3:%a)))
-  (sdl3:render-rect (renderer app) (make-instance 'sdl3:frect :%x x :%y y :%w width :%h height)))
+  (sdl3:render-rect renderer (make-instance 'sdl3:frect :%x x :%y y :%w width :%h height)))
 
-(defun draw-nothing (app &key width height x y)
-  (declare (ignore app width height x y)))
+(defun draw-nothing (renderer &key width height x y)
+  (declare (ignore renderer width height x y)))

@@ -6,10 +6,11 @@
   :license  "MIT"
   :version "0.0.1"
   :serial t
-  :depends-on (#:sdl3 #:alexandria #:trivial-garbage)
+  :depends-on (#:sdl3 #:alexandria #:trivial-garbage #:anaphora)
   :components ((:file "package")
 	       (:file "utils")
 	       (:file "layout")
 	       (:file "element")
 	       (:file "draw")
+	       (:file "cache")
                (:file "gauthali")))

@@ -14,7 +14,26 @@
    (font :initarg :font :accessor font)
    (text-engine :initarg :text-engine :accessor text-engine)
    (last-frame :initform (get-internal-real-time) :accessor last-frame)
-   (state :initform (make-instance 'state) :accessor state)))
+   (state :initform (make-instance 'state) :accessor state)
+   (drawcache :initform (make-drawcache) :accessor drawcache)))
+
+(defun get-font (app &optional font-size)
+  (when font-size
+    (sdl3-ttf:set-font-size (font app) font-size))
+  (font app))
+
+(defun get-render-drivers ()
+  (loop for i from 0 below (sdl3:get-num-render-drivers)
+	collect (sdl3:get-render-driver i)))
+
+(defun create-texture (app w h)
+  (declare (type integer w h))
+  (let ((texture (sdl3:create-texture (renderer app)
+				      (sdl3:get-window-pixel-format (window app))
+				      :target
+				      w h)))
+    (assert (not (cffi:null-pointer-p texture)))
+    texture))
 
 (defun init ()
   (assert-ret (sdl3:set-app-metadata "Gauthali" "1.0" "com.bpanthi.gauthali"))
@@ -38,9 +57,9 @@
 		     :font font
 		     :text-engine text-engine))))
 
-
 (defun render (app)
-  (let ((r (renderer app)))
+  (let ((r (renderer app))
+	(text-engine (text-engine app)))
     (multiple-value-bind (ret w h) (sdl3:get-window-size (window app))
       (assert-ret ret)
       (sdl3:set-render-draw-color r 255 255 255 255)
@@ -48,46 +67,64 @@
       (let ((fps (/ internal-time-units-per-second
 		    (- (get-internal-real-time) (last-frame app)))))
 	(setf (last-frame app) (get-internal-real-time))
-	(draw-text app
-		   (format nil "FPS: ~,3f [~,3f]" fps (/ (frame-rate app)))
-		   :font-size 18.0
-		   :color (color 0 0 0 255)
-		   :x (coerce w 'float) :y 0.0
-		   :width 0
-		   :anchor '(:right . :top)))
+	(draw-element-tree
+	 (create-text-element text-engine
+			      (format nil "FPS: ~,3f [~,3f]" fps (/ (frame-rate app)))
+			      :font (get-font app 18.0)
+			      :color (color 0 0 0 255))))
+
       (let ((purple (color 100 0 100 255))
 	    (red (color 255 0 0 255))
 	    (green (color 0 255 0 255))
-	    (blue (color 0 0 255 255))
 	    (white (color 0 0 0 255)))
+	(with-drawcache ((drawcache app))
+	  (draw-element-tree
+	   (solve-elements-layout
+	    (<> (draw-nothing r :width w :height h) ;; ROOT ELEMENT
+		(:major-axis :col :col (:child-gap 10.0))
+	      (register-element
+	       (cache-element r t nil
+			      (lambda ()
+				(let ((*current-element* nil))
+				  (<> (draw-nothing r :width w :height 50.0)
+				      nil)))))
+	      (<> (draw-rectangle-frame r :width :fit :height 10.0)
+		  nil
+		(<> (draw-rectangle-frame r :width :flex :height 10.0 :color green)
+		    nil
+		  (<> (draw-rectangle-frame r :width 10.0 :height 10.0 :color red))))
+	      (<!> (t)
+		  (draw-rectangle-frame r :color green)
+		  (:row (:child-gap 5.0) :col (:padding 3.0))
 
-	(draw-element
-	 (solve-elements-layout
-	  (<> (draw-nothing app :width w :height h)    ;; ROOT ELEMENT
-	      (:major-axis :col :col (:child-gap 10.0))
+		(<> (draw-rectangle r :width 100.0 :height 50.0 :color purple))
+		(<> (draw-rectangle r :width 100.0 :height 60.0 :color red)))
 
-	    (<> (draw-rectangle-frame app :color green)
-		(:row (:child-gap 5.0) :col (:padding 3.0))
-
-	      (<> (draw-rectangle app :width 100.0 :height 50.0 :color purple))
-	      (<> (draw-rectangle app :width 100.0 :height 60.0 :color red)))
-
-	    (<> (draw-rectangle-frame app :width (:flex 1.0) :color red)
-		(:col (:align :center))
-
-	      (<> (draw-rectangle app :width 100.0 :height 25.0 :color blue))
-	      (<> (draw-rectangle app :width (:flex 1.0) :height 100.0 :color green))
-	      (<> (draw-rectangle app :width (:flex 3.0) :height 60.0 :color purple))))))
-
-	(draw-element
-	 (solve-elements-layout
-	  (<> (draw-nothing app :width w :height h) ;; ROOT ELEMENT
-	      (:col (:align :center) :row (:align :center))
-	    (register-element
-	     (create-text-element app "Panthi bhai ko UI library maa text wrapping pani garinxa."
-				  :font-size 40.0
-				  :color white
-				  :width w))))))
+	      (<!> (w)
+		  (draw-rectangle-frame r :width (:flex 1.0) :color red)
+		  (:col (:align :center))
+		(<> (draw-rectangle r :width (:flex 1.0) :height 100.0 :color green))
+		(<> (draw-rectangle r :width (:flex 3.0) :height 60.0 :color purple)))
+	      (register-element
+	       (cache-element
+		r
+		(list w h)
+		nil
+		(lambda ()
+		  (create-text-element text-engine "Hello!"
+				       :font (get-font app 40.0)
+				       :color white
+				       :width w))))
+	      (register-element
+	       (cache-element
+		r
+		(list w h)
+		nil
+		(lambda ()
+		  (create-text-element text-engine "Bibek dai ko UI library maa text wrapping pani garinxa."
+				       :font (get-font app 40.0)
+				       :color white
+				       :width w)))))))))
 
       (sdl3:render-present r))))
 
@@ -105,18 +142,10 @@
 	       "Ctrl + V"
 	       (setf (clipboard s) (sdl3:get-clipboard-text))))
 	 (t t)))
-      (sdl3:window-event
-       (case (slot-value event 'sdl3:%type)
-	 (:window-resized
-	  (let ((width (slot-value event 'sdl3:%data-1))
-		(height (slot-value event 'sdl3:%data-2)))
-	    (print (list :resized width height))
-	    (print "Hi!")))
-	 (t t)))
-
       (t t))))
 
 (defun handle-quit (app)
+  (destroy-drawcache (drawcache app))
   (sdl3:destroy-renderer (renderer app))
   (sdl3:destroy-window (window app))
   (sdl3-ttf:close-font (font app))
@@ -132,7 +161,6 @@
 	 (type (slot-value event 'sdl3:%type)))
     (when (or (eql type :window-resized)
 	      (eql type :window-exposed))
-      (print :window-resized)
       (render *app*)))
     t)
 
@@ -152,8 +180,8 @@
 	   (let ((render-time-diff (/ (- (get-internal-real-time) last-frame-update)
 				      internal-time-units-per-second)))
 	     (cond ((> render-time-diff (frame-rate app))
-		    (render app)
-		    (setf last-frame-update (get-internal-real-time)))
+		    (setf last-frame-update (get-internal-real-time))
+		    (render app))
 		   (t (sleep (/ (- (frame-rate app) render-time-diff) 2))))))
       (handle-quit app))))
 

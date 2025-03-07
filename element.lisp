@@ -1,9 +1,14 @@
 (in-package :gauthali)
 
 (defstruct element
+  "ELEMENT stores information necessary to layout and draw UI.
+
+Use draw-tree-fn if you want the children elements only for
+layout computation and you handle the drawing in the parent."
   (x (make-layout) :type layout)
   (y (make-layout) :type layout)
-  (draw-fn nil :type (or null function))
+  (draw-fn nil :type (or null (function (integer integer integer integer))))
+  (draw-tree-fn nil :type (or null (function (element))))
   (children (make-array 0) :type array))
 
 (defmethod print-object :around ((obj element) stream)
@@ -74,32 +79,37 @@ nil          => alignment :start
 
 (defun register-element (el)
   (when *current-element*
-    (vector-push-extend el (element-children *current-element*))))
+    (vector-push-extend el (element-children *current-element*)))
+  el)
 
-(defun map-elements-tree (fn root)
+(defun map-element-tree (fn root)
   (cons (funcall fn root)
 	(loop for el across (element-children root)
-	      collect (map-elements-tree fn el))))
+	      collect (map-element-tree fn el))))
 
 (defun solve-elements-layout (root)
-  (let ((width-layout-tree (map-elements-tree #'element-x root))
-	(height-layout-tree (map-elements-tree #'element-y root)))
+  (let ((width-layout-tree (map-element-tree #'element-x root))
+	(height-layout-tree (map-element-tree #'element-y root)))
     (solve-layout-tree width-layout-tree)
     (solve-layout-tree height-layout-tree)
     root))
 
-(defun draw-element (el)
+(defun draw-element-tree (el)
   "Call the render function of el and then its children."
-  (with-slots (x y) el
-    (funcall (element-draw-fn el)
-	     (layout-size x) (layout-size y)
-	     (layout-offset x) (layout-offset y)))
-  (loop for child across (element-children el)
-	do (draw-element child)))
+  (if (element-draw-tree-fn el)
+      (funcall (element-draw-tree-fn el) el)
+      (progn
+	(with-slots (x y) el
+	  (funcall (element-draw-fn el)
+		   (layout-size x) (layout-size y)
+		   (layout-offset x) (layout-offset y)))
 
-(defun translate-element (root x y)
+	(loop for child across (element-children el)
+	      do (draw-element-tree child)))))
+
+(defun translate-element-tree (root x y)
   "Translate element (and its children) by (x, y)"
   (incf (layout-offset (element-x root)) x)
   (incf (layout-offset (element-y root)) y)
   (loop for el across (element-children root) do
-	(translate-element el x y)))
+	(translate-element-tree el x y)))
