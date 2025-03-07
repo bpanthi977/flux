@@ -58,11 +58,11 @@
       (let ((purple (color 100 0 100 255))
 	    (red (color 255 0 0 255))
 	    (green (color 0 255 0 255))
-	    (blue (color 0 0 255 255)))
+	    (blue (color 0 0 255 255))
+	    (white (color 0 0 0 255)))
 
 	(draw-element
 	 (solve-elements-layout
-
 	  (<> (draw-nothing app :width w :height h)    ;; ROOT ELEMENT
 	      (:major-axis :col :col (:child-gap 10.0))
 
@@ -77,21 +77,17 @@
 
 	      (<> (draw-rectangle app :width 100.0 :height 25.0 :color blue))
 	      (<> (draw-rectangle app :width (:flex 1.0) :height 100.0 :color green))
-	      (<> (draw-rectangle app :width (:flex 3.0) :height 60.0 :color purple)))))))
+	      (<> (draw-rectangle app :width (:flex 3.0) :height 60.0 :color purple))))))
 
-
-      (draw-rectangle app
-		      :color (color 100 0 100 255)
-		      :width 200.0
-		      :height 50.0
-		      :x 50.0
-		      :y 250.0)
-      (draw-text app "Gauthali"
-		 :font-size 40.0
-		 :color (color 0 0 0 255)
-		 :x (* 0.5 w) :y (* 0.5 h)
-		 :width 0
-		 :anchor '(:center . :center))
+	(draw-element
+	 (solve-elements-layout
+	  (<> (draw-nothing app :width w :height h) ;; ROOT ELEMENT
+	      (:col (:align :center) :row (:align :center))
+	    (register-element
+	     (create-text-element app "Panthi bhai ko UI library maa text wrapping pani garinxa."
+				  :font-size 40.0
+				  :color white
+				  :width w))))))
 
       (sdl3:render-present r))))
 
@@ -138,8 +134,7 @@
 	      (eql type :window-exposed))
       (print :window-resized)
       (render *app*)))
-
-    t))
+    t)
 
 (defun run-app ()
   (let ((app (init))

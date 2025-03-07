@@ -4,7 +4,6 @@
   (x (make-layout) :type layout)
   (y (make-layout) :type layout)
   (draw-fn nil :type (or null function))
-  (parent nil :type (or null element))
   (children (make-array 0) :type array))
 
 (defmethod print-object :around ((obj element) stream)
@@ -21,10 +20,10 @@ nil     => type :fit
 :max x  => maximum x
 
 Position:
-nil         => alignment :start
-align x     => alignment x
-padding x   => padding x
-child-gap x => child-gap x"
+nil          => alignment :start
+:align x     => alignment x
+:padding x   => padding x
+:child-gap x => child-gap x"
   (let ((layout (make-layout)))
     (with-slots (padding alignment child-gap type size minimum maximum flex-value) layout
       (when position
@@ -52,9 +51,8 @@ child-gap x => child-gap x"
   (destructuring-bind (&key row col (major-axis :row)) grid-args
     (let ((el (gensym "EL-")))
       `(let ((,el (make-element
-		   :x (create-layout ,(if (listp width) `(list ,@width) width) ,(when row `(list ,@row)))
-		   :y (create-layout ,(if (listp height) `(list ,@height) height) ,(when col `(list ,@col)))
-		   :parent *current-element*
+		   :x (create-layout ,(if (alexandria:proper-list-p width) `(list ,@width) width) ,(when row `(list ,@row)))
+		   :y (create-layout ,(if (alexandria:proper-list-p height) `(list ,@height) height) ,(when col `(list ,@col)))
 		   :draw-fn (lambda (width height x y)
 			      (,draw-fn ,app :width width
 					     :height height
@@ -74,6 +72,10 @@ child-gap x => child-gap x"
 	   ,@body
 	   ,el)))))
 
+(defun register-element (el)
+  (when *current-element*
+    (vector-push-extend el (element-children *current-element*))))
+
 (defun map-elements-tree (fn root)
   (cons (funcall fn root)
 	(loop for el across (element-children root)
@@ -86,13 +88,6 @@ child-gap x => child-gap x"
     (solve-layout-tree height-layout-tree)
     root))
 
-(defun create-test-elements ()
-  (element (draw-nothing nil :width 500.0 :height 500.0)
-      (:row (:padding 12.0 :child-gap 3.0))
-    (element (draw-nothing nil) nil
-      (element (draw-nothing nil :width 100.0 :height 100.0) nil))
-    (element (draw-nothing nil :width (:flex 1.0) :height (:flex 1.0)) nil)))
-
 (defun draw-element (el)
   "Call the render function of el and then its children."
   (with-slots (x y) el
@@ -101,3 +96,10 @@ child-gap x => child-gap x"
 	     (layout-offset x) (layout-offset y)))
   (loop for child across (element-children el)
 	do (draw-element child)))
+
+(defun translate-element (root x y)
+  "Translate element (and its children) by (x, y)"
+  (incf (layout-offset (element-x root)) x)
+  (incf (layout-offset (element-y root)) y)
+  (loop for el across (element-children root) do
+	(translate-element el x y)))
