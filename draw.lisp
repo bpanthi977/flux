@@ -6,10 +6,7 @@
       (sdl3-ttf:set-text-wrap-width ttf-text (or width 0))
       (multiple-value-bind (ret w h) (sdl3-ttf:get-text-size ttf-text)
 	(assert-ret ret)
-	(let ((el (make-element
-		   :x (make-layout :type :fixed :size (coerce w 'single-float))
-		   :y (make-layout :type :fixed :size (coerce h 'single-float))
-		   :draw-fn (lambda (w h x y)
+	(let* ((draw-fn (lambda (w h x y)
 			      (declare (ignore w h))
 			      (when color
 				(sdl3-ttf:set-text-color ttf-text
@@ -17,8 +14,12 @@
 							 (slot-value color 'sdl3:%g)
 							 (slot-value color 'sdl3:%b)
 							 (slot-value color 'sdl3:%a)))
-			      (sdl3-ttf:draw-renderer-text ttf-text x y)))))
-	  (trivial-garbage:finalize el (lambda () (sdl3-ttf:destroy-text ttf-text)))
+			      (sdl3-ttf:draw-renderer-text ttf-text x y)))
+	       (el (make-element
+		   :x (make-layout :type :fixed :size (coerce w 'single-float))
+		   :y (make-layout :type :fixed :size (coerce h 'single-float))
+		   :draw-fn draw-fn)))
+	  (trivial-garbage:finalize draw-fn (lambda () (sdl3-ttf:destroy-text ttf-text)))
 	  el)))))
 
 (defun draw-rectangle (renderer &key width height x y color)
