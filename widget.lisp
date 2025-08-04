@@ -1,79 +1,6 @@
 (in-package #:gauthali)
 
-(defmacro property-set (property value)
-  "Set the property value for children widgets."
-  (declare (ignore property value))
-  `(error "property-set macro is only allowed inside defwidget."))
-
-(defmacro property-get (property &optional default)
-  "Get the property value set by parent/ancestor widgets."
-  (declare (ignore property default))
-  (error "property-get macro can be called only inside defwidget definition."))
-
-(defstruct widget
-  (init-function nil :type (function ((or node null) context) node))
-  (render-function nil :type (function (node)))
-  (body-function nil :type (function (node context))))
-
-(defmacro defwidget (name (&rest lambda-list)
-		     (&key state render)
-		     &body body)
-  (let ((node (gensym "node"))
-	(context (gensym "context"))
-	(version (1+ (get name :gauthali.widget.version -1))))
-    (setf (get name :gauthali.widget.version) version)
-    (let* ((decals (if (and (listp body) (listp (first body)) (eql (first (first body)) 'declare))
-		       (first body)))
-	   (body (if decals (rest body) body)))
-      `(defun ,name (,@lambda-list)
-	 ,decals
-	 (symbol-macrolet (,@(loop for i from 0
-				   for binding in state
-				   for var = (if (listp binding) (first binding) binding)
-				   collect (list var `(aref (node-state ,node) ,i))))
-	   (make-widget
-	    :init-function
-	    (lambda (,node ,context)
-	      (declare (ignorable ,context))
-	      (unless (and ,node (eql (node-version ,node) ,version))
-		(setf ,node (make-node :class ',name
-				       :version ,version
-				       :dirty t
-				       :state (make-array ,(length state) :initial-element nil)))
-		;; Initialize variables
-		,@(loop for binding in state
-			for i from 0
-			when (listp binding)
-			  collect `(setf ,(first binding) ,(second binding))))
-	      ,node)
-
-	    :body-function
-	    (lambda (,node ,context)
-	      (declare (ignorable ,node ,context))
-	      ;; Set body function
-	      (setf (fill-pointer (node-properties ,node)) 0)
-	      (macrolet ((property-set (property value)
-			    `(vector-push-extend (cons ,property ,value) (node-properties ,',node)))
-			  (property-get (property &optional default)
-			    `(property-get% ,',context ,property ,default)))
-		,@body))
-
-	    :render-function
-	    (lambda (,node)
-	      (declare (ignorable ,node))
-	      ,render)))))))
-
-(defstruct node
-  (class nil)
-  (version 0 :type fixnum)
-  (dirty nil :type boolean)
-  (id nil)
-  (parent nil)
-  (state (vector) :type vector)
-  (properties (make-array 0 :fill-pointer 0 :adjustable t) :type vector)
-  (children (make-array 0 :fill-pointer 0 :adjustable t))
-  (render-function nil)
-  (body-function nil))
+;;; CONTEXT
 
 (defstruct context
   (properties (make-hash-table)))
@@ -98,75 +25,132 @@
     (unless entry
       (setf entry (make-property))
       (setf (gethash property (context-properties context)) entry))
-    (vector-push-extend value entry)))
+    (vector-push-extend value entry)
+    value))
 
-(defun context-setup (context node)
-  (loop for (property . value) across (node-properties node)  do
+(defun context-setup (context widget)
+  (loop for (property . value) across (widget-properties widget)  do
     (context-set-property% context property value)))
 
-(defun context-restore (context node)
-  (loop for (property . value) across (node-properties node)
+(defun context-restore (context widget)
+  (loop for (property . value) across (widget-properties widget)
 	for entry = (gethash property (context-properties context))
 	do
 	   (vector-pop entry)))
 
-(defun create-node (widget context old-node)
-  (let ((node (funcall (widget-init-function widget) old-node context)))
-    (setf (node-body-function node) (widget-body-function widget)
-	  (node-render-function node) (widget-render-function widget))
-    node))
+;;;; WIDGET WIDGET
 
-(defun update-widget-tree (node context)
-  (when (node-dirty node)
-    (setf (node-dirty node) nil)
+(defstruct widget
+  (name nil)
+  (version 0 :type fixnum)
+  (build-function nil :type (or null (function (widget context))))
+  (render-function nil :type (or null (function (widget float float float float))))
+  (dirty nil :type boolean)
+  (id nil)
+  (parent nil)
+  (state (vector) :type vector)
+  (properties (make-array 0 :fill-pointer 0 :adjustable t) :type vector)
+  (children (make-array 0 :fill-pointer 0 :adjustable t)))
 
-    (let* ((child-nodes (node-children node))
-	   (old-length (length child-nodes)))
-      (context-setup context node)
+(defmacro property-set (property value)
+  "Set the property value for children widgets."
+  (declare (ignore property value))
+  `(error "property-set macro is only allowed inside defwidget."))
 
-      ;; Update node-children
-      (setf (fill-pointer child-nodes) 0)
-      (loop for i from 0
-	    for child-widget in (uiop:ensure-list (funcall (node-body-function node) node context))
-	    for child-old-node = (when (< i old-length) (aref child-nodes i))
-	    do
-	       (let ((child-node (create-node child-widget context child-old-node)))
-		 (update-widget-tree child-node context)
-		 (vector-push-extend child-node child-nodes)))
+(defmacro property-get (property &optional default)
+  "Get the property value set by parent/ancestor widgets."
+  (declare (ignore property default))
+  (error "property-get macro can be called only inside defwidget definition."))
 
-      (context-restore context node))))
+(defun destructure-defwidget-args (args)
+  (let (state build render)
+    (flet ((render-lambda-formp (form)
+	     (and (= 4 (length form))
+		  (every #'symbolp form))))
+      (loop for clause in args do
+	(cond ((or (not (listp clause))
+		   (not (member (first clause) '(:state :build :render))))
+	       (error "~a not a list beginning with :state, :build, :render." clause))
+	      (t
+	       (case (first clause)
+		 (:state (setf state (rest clause)))
+		 (:build (setf build (rest clause)))
+		 (:render
+		  (unless (render-lambda-formp (second clause))
+		    (error ":render clause must have following form: (:render (x y w h) &body body)."))
+		  (setf render (rest clause))))))))
+    (values state build render)))
 
-(defun render (node)
-  (when (node-render-function node)
-    (funcall (node-render-function node) node))
-  (loop for child across (node-children node) do
-	(render child)))
+(defmacro defwidget (name (&rest lambda-list)
+		     &body args)
+  (let ((widget (gensym "widget"))
+	(context (gensym "context"))
+	(version (1+ (get name :gauthali.widget.version -1))))
+    (setf (get name :gauthali.widget.version) version)
+    (multiple-value-bind (state build render)
+	(destructure-defwidget-args args)
+      (let* ((decals (if (and (listp build) (listp (first build)) (eql (first (first build)) 'declare))
+			 (first build)))
+	     (build (if decals (rest build) build)))
+	`(defun ,name (,@lambda-list)
+	   ,decals
+	   (lambda (,widget ,context)
+	     (declare (ignorable ,context))
+	     ;; Create widget if necessary
+	     (unless (and ,widget (eql (widget-version ,widget) ,version))
+	       (symbol-macrolet (,@(loop for i from 0
+					 for binding in state
+					 for var = (if (listp binding) (first binding) binding)
+					 collect (list var `(aref (widget-state ,widget) ,i))))
+		 (setf ,widget (make-widget
+			      :name ',name
+			      :version ,version
+			      :dirty t
+			      :state (make-array ,(length state) :initial-element nil)
+			      :build-function
+			      (lambda (,widget ,context)
+				(declare (ignorable ,widget ,context))
+				;; Set build function
+				(setf (fill-pointer (widget-properties ,widget)) 0)
+				(macrolet ((property-set (property value)
+					     `(vector-push-extend (cons ,property ,value) (widget-properties ,',widget)))
+					   (property-get (property &optional default)
+					     `(context-get-property% ,',context ,property ,default)))
+				  ,@build))
+			      :render-function
+			      ,(when render
+				 `(lambda (,widget ,@(first render))
+				    (declare (ignorable ,widget))
+				    ,@(rest render)))))
+		 ;; Initialize variables
+		 ,@(loop for binding in state
+			 for i from 0
+			 when (listp binding)
+			   collect `(setf ,(first binding) ,(second binding)))))
+	     ;; Return widget (the same or the newly created one)
+	     ,widget))))))
 
-(defparameter *state* 1)
-(defun start-ui (root-widget context)
-  (setf *state* 1)
-  (let* ((node (create-node root-widget context nil)))
-    (update-widget-tree node context)
-    ;; TODO: wait for event
-    ;; TODO: process event
-    (setf *state* 2)
-    ;; Update widget tree
-    (update-widget-tree node context)
-    ;; Render to screen
-    (render node)
-    (values node context)))
+(defun update-widget-tree (widget context)
+  (cond ((widget-dirty widget)
+	 (setf (widget-dirty widget) nil)
 
-(defun main ()
-  (assert-ret (sdl3-ttf:init))
-  (let ((font (sdl3-ttf:open-font (namestring (get-resource-path "res/fonts/Times New Roman.ttf")) 18.0))
-	(context (make-context)))
-    (unwind-protect
-	 (progn
-	   (context-set-property% context
-				  :layout
-				  (list :x (make-layout :type :fixed :size 200.0)
-					:y (make-layout :type :fixed :size 100.0 :major-axisp nil)))
-	   (context-set-property% context :font font)
-	   (start-ui (home-screen) context))
-      (sdl3-ttf:close-font font)
-      (sdl3-ttf:quit))))
+	 (let* ((child-widgets (widget-children widget))
+		(old-length (length child-widgets)))
+	   (context-setup context widget)
+
+	   ;; Update widget-children
+	   (setf (fill-pointer child-widgets) 0)
+	   (loop for i from 0
+		 for child-widget-func in (uiop:ensure-list (funcall (widget-build-function widget) widget context))
+		 for child-old-widget = (when (< i old-length) (aref child-widgets i))
+		 do
+		    (let ((child-widget (funcall child-widget-func child-old-widget context)))
+		      (update-widget-tree child-widget context)
+		      (vector-push-extend child-widget child-widgets)))
+
+	   (context-restore context widget)))
+	(t ;; widget is not dirty but the children might be
+	 (context-setup context widget)
+	 (loop for child-widget across (widget-children widget) do
+	       (update-widget-tree widget context))
+	 (context-restore context widget))))

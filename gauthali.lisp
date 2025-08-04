@@ -35,6 +35,42 @@
     (assert (not (cffi:null-pointer-p texture)))
     texture))
 
+(defun render (node)
+  (when (node-render-function node)
+    (funcall (node-render-function node) node))
+  (loop for child across (node-children node) do
+	(render child)))
+
+(defparameter *state* 1)
+(defun start-ui (root-widget context)
+  (setf *state* 1)
+  (let* ((node (create-node root-widget context nil)))
+    (update-widget-tree node context)
+    ;; TODO: wait for event
+    ;; TODO: process event
+    (setf *state* 2)
+    ;; Update widget tree
+    (update-widget-tree node context)
+    ;; Render to screen
+    (render node)
+    (values node context)))
+
+(defun main ()
+  (assert-ret (sdl3-ttf:init))
+  (let ((font (sdl3-ttf:open-font (namestring (get-resource-path "res/fonts/Times New Roman.ttf")) 18.0))
+	(context (make-context)))
+    (unwind-protect
+	 (progn
+	   (context-set-property% context
+				  :layout
+				  (list :x (make-layout :type :fixed :size 200.0)
+					:y (make-layout :type :fixed :size 100.0 :major-axisp nil)))
+	   (context-set-property% context :font font)
+	   (start-ui (home-screen) context))
+      (sdl3-ttf:close-font font)
+      (sdl3-ttf:quit))))
+
+
 (defun init ()
   (assert-ret (sdl3:set-app-metadata "Gauthali" "1.0" "com.bpanthi.gauthali"))
   (assert-ret (sdl3:init :video))
