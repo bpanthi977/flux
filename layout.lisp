@@ -42,6 +42,7 @@
 size = ∑   size(children) [If dimension is major axis]
 size = max size(children) [If dimension is minor aixs]"
   (unless (eql (layout-type el) :fixed)
+    (setf (layout-size el) 0.0)
     (flet ((compute (reduce-fn)
 	     (let* ((children-size
 		      (loop for child in children
