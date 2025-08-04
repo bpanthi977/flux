@@ -19,25 +19,43 @@
 	   (trivial-garbage:finalize ttf-text (lambda () (sdl3-ttf:destroy-text ptr))))
 	 (multiple-value-bind (ret w h) (sdl3-ttf:get-text-size ttf-text)
 	   (assert-ret ret)
-	   (property-set :width.max (coerce w 'single-float))
-	   (property-set :height.min (coerce h 'single-float)))))
+	   (layout-set :flex.x 1.0
+		       :width.max (coerce w 'single-float)
+		       :height.min (coerce h 'single-float)))))
 
        nil))
-  (:render (x y w h)
-	   (declare (ignorable h))
-	   (sdl3-ttf:set-text-wrap-width ttf-text w)
+  (:on-layout-x (x w)
+		(declare (ignore x))
+		(sdl3-ttf:set-text-wrap-width ttf-text (floor w))
+		(multiple-value-bind (ret w h) (sdl3-ttf:get-text-size ttf-text)
+		  (declare (ignore w))
+		  (assert-ret ret)
+		  (layout-set :height.min (coerce h 'single-float))))
+  (:render (r x y w h)
+	   (declare (ignorable r h))
+	   (sdl3-ttf:set-text-wrap-width ttf-text (floor w))
 	   (sdl3-ttf:draw-renderer-text ttf-text x y)))
 
 (defwidget button (name on-click)
   (:build
    (declare (ignorable name on-click))
-   (property-set :padding.x 10.0)
-   (property-set :padding.y 10.0)
-   (text name)))
+   (layout-set :flex.x 1.0
+	       :padding.x 5.0
+	       :padding.y 20.0
+	       :alignment.x :start
+	       :alignment.y :center)
+   (text name))
+  (:render (r x y w h)
+	   (sdl3:set-render-draw-color r 125 125 125 125)
+	   (sdl3:render-rect r (make-instance 'sdl3:frect :%h h :%w w :%y y :%x x))))
 
-
+(defwidget spacer-x ()
+  (:build
+   (layout-set :flex.x 1.0)))
 
 (defwidget home-screen ()
   (:build
-   (list (button "Start" (lambda () (print 'started)))
-	 (button "Stop" (lambda () (print 'stopped))))))
+   (layout-set :flex.x 1.0)
+   (list (button "Start!" (lambda () (print 'stopped)))
+	 (button "Stop!!" (lambda () (print 'started)))
+	 (spacer-x))))
