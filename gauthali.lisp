@@ -1,13 +1,14 @@
 (require 'sdl3)
 (in-package #:gauthali)
 
-(defun handle-event (event)
-  (typecase event
-    (sdl3:keyboard-event
-     (case (sdl3:%key event)
-       (:q (cffi:with-foreign-object (ev '(:struct sdl3:quit-event))
-	     (setf (cffi:foreign-slot-value ev '(:struct sdl3:quit-event) 'sdl3:%type) :quit)
-	     (sdl3:push-event ev)))))))
+(defun handle-event (event root)
+  (unless (eql (call-event-handlers root event) :stop)
+    (typecase event
+      (sdl3:keyboard-event
+       (case (sdl3:%key event)
+	 (:q (cffi:with-foreign-object (ev '(:struct sdl3:quit-event))
+	       (setf (cffi:foreign-slot-value ev '(:struct sdl3:quit-event) 'sdl3:%type) :quit)
+	       (sdl3:push-event ev))))))))
 
 
 (defun update-ui (window renderer root-widget context)
@@ -104,7 +105,7 @@
 		   (when event
 		     (if (typep event 'sdl3:quit-event)
 			 (return))
-		     (handle-event event)
+		     (handle-event event root)
 		     (case (sdl3:%type event)
 		       (:window-resized (setf width (sdl3:%data-1 event)
 					      height (sdl3:%data-2 event)

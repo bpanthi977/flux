@@ -54,6 +54,7 @@
   (layout-x (make-layout :major-axisp t) :type layout)
   (layout-y (make-layout :major-axisp nil) :type layout)
   (properties (make-array 0 :fill-pointer 0 :adjustable t) :type vector)
+  (event-handlers (make-array 0 :fill-pointer 0 :adjustable t))
   (children (make-array 0 :fill-pointer 0 :adjustable t)))
 
 (defvar *widget-symbol* nil
@@ -99,6 +100,19 @@
   (unless *allow-widget-access*
     (error "widget-rebuild can only be called from inside defwidget."))
   `(setf (widget-dirty ,*widget-symbol*) t))
+
+(defmacro widget-bounds ()
+  "Returns (values x y w h)"
+  (unless *allow-widget-access*
+    (error "widget-bounds can only be called from inside defwidget."))
+  `(let ((lx (widget-layout-x ,*widget-symbol*))
+	 (ly (widget-layout-y ,*widget-symbol*)))
+     (values (layout-offset lx) (layout-offset ly) (layout-size lx) (layout-size ly))))
+
+(defmacro on (event-class-symbol handler)
+  (unless (and *allow-widget-access* *allow-context-access*)
+    (error "on can only be called from inside defwidget in :build."))
+  `(vector-push-extend (cons (find-class ,event-class-symbol)  ,handler) (widget-event-handlers ,*widget-symbol*)))
 
 (defun destructure-defwidget-args (args)
   (let (state build on-layout-x on-layout-y render)
@@ -180,6 +194,7 @@
 				    (declare (ignorable ,widget ,context))
 				    ;; Set build function
 				    (setf (fill-pointer (widget-properties ,widget)) 0)
+				    (setf (fill-pointer (widget-event-handlers ,widget)) 0)
 				    ,(trivial-macroexpand-all:macroexpand-all
 				      `(progn ,@build))))
 			      :on-layout-x-function
@@ -335,3 +350,22 @@
 	       (loop for child across (widget-children widget)
 		     do (rec child)))))
     (rec widget)))
+
+(defun call-event-handlers (widget event)
+  "Find and class event handlers registered in widget tree recursively.
+Stop when the first only returns :stop.
+
+Returns :stop if any handler returned :stop, otherwise nil."
+  (let ((event-class (class-of event)))
+    (labels ((rec (widget)
+	       (when (or (loop for (class . handler) across (widget-event-handlers widget)
+			       for result = (when (eql event-class class)
+					      (funcall handler event))
+			       when (eql result :stop)
+				 return t)
+			 (loop for child across (widget-children widget)
+			       for result = (rec child)
+			       when (eql result :stop)
+				 return t))
+		 :stop)))
+      (rec widget))))
