@@ -47,8 +47,7 @@ size = max size(children) [If dimension is minor aixs]"
 	       (loop for child in children
 		     for l = (car child)
 		     with acc = 0.0d0
-		     when (not (eql (layout-alignment l) :relative))
-		       do (setf acc (funcall reduce-fn acc (funcall accessor l)))
+		     do (setf acc (funcall reduce-fn acc (funcall accessor l)))
 		     finally (return acc)))
 
 	     (compute (reduce-fn)
