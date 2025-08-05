@@ -51,9 +51,9 @@
 	       (setf prev-print t)))))
 
 
-
+(defparameter *enable-inspect* nil)
 (defun inspect-widgets (x y root)
-  (when (and x y)
+  (when (and x y *enable-inspect*)
     (let ((result))
       (labels ((widget-in-bounds-p (widget x y)
 		 (let ((lx (widget-layout-x widget))
