@@ -201,11 +201,13 @@
 			      ,(when render
 				 (defwidget-create-lambda render))))
 	       ;; Initialize variables
-	       (unless use-old
-		 ,@(loop for binding in state
-			 for i from 0
-			 when (listp binding)
-			   collect `(setf ,(first binding) ,(second binding)))))
+	       (let ((*widget* ,widget)
+		     (*context* ,context))
+		 (unless use-old
+		   ,@(loop for binding in state
+			   for i from 0
+			   when (listp binding)
+			     collect `(setf ,(first binding) ,(second binding))))))
 	     ;; Return widget (the same or the newly created one)
 	     ,widget))))))
 
@@ -229,8 +231,8 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 (defmacro layout (#.`(&rest keyword-args &key ,@*layout-set-keys*) &body widget-form)
   (declare #.`(ignorable ,@*layout-set-keys*))
   `(wrap-build (progn ,@widget-form)
-     (call-original-build)
-     (layout-set ,@keyword-args)))
+     (prog1 (call-original-build)
+       (layout-set ,@keyword-args))))
 
 (defun recompiledp (widget)
   (not (eql (widget-version widget)
