@@ -41,12 +41,29 @@
 	   (sdl3-ttf:set-text-wrap-width ttf-text (floor w))
 	   (sdl3-ttf:draw-renderer-text ttf-text x y)))
 
-(defwidget button (name)
+(defwidget button (name on-press)
+  (:state pressed)
   (:build
+   (on 'sdl3:mouse-button-event
+       (lambda (event)
+	 (let ((old pressed))
+	   (if (sdl3:%down event)
+	       (multiple-value-bind (x y w h) (widget-bounds)
+		 (if (and (<= x (sdl3:%x event) (+ x w))
+			  (<= y (sdl3:%y event) (+ y h)))
+		     (setf pressed t)
+		     (setf pressed nil)))
+	       (setf pressed nil))
+	   (unless (eql old pressed)
+	     (when pressed
+	       (funcall on-press))
+	     (widget-rebuild)))))
+
    (layout-set :flex.x :least
+	       :width.min 150.0
 	       :padding.x 5.0
 	       :padding.y 20.0
-	       :alignment.x :start
+	       :alignment.x :center
 	       :alignment.y :center)
    (text name))
   (:render (r x y w h)
@@ -71,7 +88,7 @@
 	   (declare (ignore r x y w h))
 	   (if (not refresh-time)
 	       (setf refresh-time (get-internal-real-time)))
-	   (let ((delta (- 1.0 (seconds-elapsed refresh-time))))
+	   (let ((delta (- .1 (seconds-elapsed refresh-time))))
 	     (if (< delta 0)
 		 (progn (setf refresh-time (get-internal-real-time))
 			(widget-rebuild))
@@ -84,7 +101,7 @@
 (defwidget home-screen ()
   (:build
    (layout-set :flex.x 1.0)
-   (list (button "Start!")
-	 (button "Stop!!")
+   (list (button "Start!" (lambda () (print "Start clicked!")))
+	 (button "Stop!!" (lambda () (print "Stop clicked!")))
 	 (spacer)
 	 (countdown))))
