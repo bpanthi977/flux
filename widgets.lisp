@@ -1,7 +1,7 @@
 (in-package #:gauthali)
 
 (defwidget text (text)
-  (:state _text ttf-text)
+  (:state _text ttf-text width height)
   (:build
    ;; Compute layout ranges
    ;; no further children widgets
@@ -20,18 +20,22 @@
 	   (trivial-garbage:finalize ttf-text (lambda () (sdl3-ttf:destroy-text ptr))))
 	 (multiple-value-bind (ret w h) (sdl3-ttf:get-text-size ttf-text)
 	   (assert-ret ret)
-	   (layout-set :flex.x 1.0
-		       :width.max (coerce w 'single-float)
-		       :height.min (coerce h 'single-float)))))
+	   (setf width (coerce w 'single-float))
+	   (setf height (coerce h 'single-float)))))
 
-       nil))
+     (layout-set :flex.x 1.0
+		 :width.max width
+		 :height.min height)
+
+     nil))
   (:on-layout-x (x w)
 		(declare (ignore x))
 		(sdl3-ttf:set-text-wrap-width ttf-text (floor w))
 		(multiple-value-bind (ret w h) (sdl3-ttf:get-text-size ttf-text)
 		  (declare (ignore w))
 		  (assert-ret ret)
-		  (layout-set :height.min (coerce h 'single-float))))
+		  (setf height (coerce h 'single-float))
+		  (layout-set :height.min height)))
   (:render (r x y w h)
 	   (declare (ignorable r h))
 	   (sdl3-ttf:set-text-wrap-width ttf-text (floor w))
