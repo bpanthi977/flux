@@ -13,6 +13,7 @@
      ;; Compute properties if cache is invalid
      (when (or (not ttf-text)
 	       (not (string-equal _text text)))
+       (setf _text text)
        (cffi:with-foreign-string ((str bytes) text)
 	 (setf ttf-text (sdl3-ttf:create-text text-engine font str bytes))
 	 (let ((ptr ttf-text))
@@ -36,9 +37,8 @@
 	   (sdl3-ttf:set-text-wrap-width ttf-text (floor w))
 	   (sdl3-ttf:draw-renderer-text ttf-text x y)))
 
-(defwidget button (name on-click)
+(defwidget button (name)
   (:build
-   (declare (ignorable name on-click))
    (layout-set :flex.x :least
 	       :padding.x 5.0
 	       :padding.y 20.0
@@ -54,9 +54,33 @@
    (layout-set :flex.x 1.0
 	       :flex.y 1.0)))
 
+(defun seconds-elapsed (since)
+  (* 1.0 (- (get-internal-real-time) since) (/ internal-time-units-per-second)))
+
+(defwidget countdown ()
+  (:state (mount-time (get-internal-real-time))
+	  refresh-time)
+  (:build
+   (layout-set :flex.x :least)
+   (text (format nil "~,3f" (seconds-elapsed mount-time))))
+  (:render (r x y w h)
+	   (declare (ignore r x y w h))
+	   (if (not refresh-time)
+	       (setf refresh-time (get-internal-real-time)))
+	   (let ((delta (- 1.0 (seconds-elapsed refresh-time))))
+	     (if (< delta 0)
+		 (progn (setf refresh-time (get-internal-real-time))
+			(widget-rebuild))
+		 (sb-ext:schedule-timer (sb-ext:make-timer
+					 (lambda ()
+					   (setf refresh-time (get-internal-real-time))
+					   (widget-rebuild)))
+					delta)))))
+
 (defwidget home-screen ()
   (:build
    (layout-set :flex.x 1.0)
-   (list (button "Start!" (lambda () (print 'stopped)))
-	 (button "Stop!!" (lambda () (print 'started)))
-	 (spacer))))
+   (list (button "Start!")
+	 (button "Stop!!")
+	 (spacer)
+	 (countdown))))
