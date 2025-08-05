@@ -88,7 +88,7 @@ size = max size(children) [If dimension is minor aixs]"
 	     (decf remaining value)
 	     (setf (car ref-cons) nil))
 
-	   (proportionate-size (el flex-sum)
+	   (proportionate-size (el flex-sum remaining)
 	     "New size increment that can be assigned to an `el' by using remaining size."
 	     (* (/ (layout-flex-value el)
 		   flex-sum)
@@ -100,6 +100,7 @@ size = max size(children) [If dimension is minor aixs]"
 	(loop
 	  with no-updates = nil
 	  for flex-sum = (flex-sum)
+	  for prev-remaining = remaining
 	  until (or (< (abs remaining) 0.001)
 		    no-updates)
 	  do
@@ -109,7 +110,7 @@ size = max size(children) [If dimension is minor aixs]"
 		   when el
 		     do
 			(setf no-updates nil)
-			(let* ((increment (proportionate-size el flex-sum))
+			(let* ((increment (proportionate-size el flex-sum prev-remaining))
 			       (new-size (+ (layout-size el) increment)))
 			  (cond ((> (layout-minimum el) new-size)
 				 (remove-el ref-cons (layout-minimum el)))
