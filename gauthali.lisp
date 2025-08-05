@@ -2,7 +2,6 @@
 (in-package #:gauthali)
 
 (defun handle-event (event)
-  (format t "Event: ~a~%" (sdl3:%type event))
   (typecase event
     (sdl3:keyboard-event
      (case (sdl3:%key event)
@@ -25,17 +24,57 @@
 
 (defparameter *root* nil)
 
-(defwidget root-widget (width height child-widget-func)
+(defwidget root-widget (width height child-widget-func inspect-func)
+  (:state (prev-print))
   (:build
    (layout-set :width (coerce width 'float)
 	       :height (coerce height 'float))
-   (funcall child-widget-func)))
+   (funcall child-widget-func))
+  (:render (r x y w h)
+	   (declare (ignore x y w h))
+	   (let ((widgets (funcall inspect-func)))
+	     (unless widgets
+	       (setf prev-print nil))
+	     (loop for widget in widgets
+		   for lx = (widget-layout-x widget)
+		   for ly = (widget-layout-y widget) do
+		     (unless prev-print
+		       (format t "~a~%  ~a~%  ~a~%"
+				      (widget-name widget)
+				      lx ly))
+		     (sdl3:set-render-draw-color r 255 0 0 255)
+		     (sdl3:render-rect r (make-instance 'sdl3:frect
+							:%x (layout-offset lx) :%w (layout-size lx)
+							:%y (layout-offset ly) :%h (layout-size ly))))
+	     (when widgets
+	       (setf prev-print t)))))
+
+
+
+(defun inspect-widgets (x y root)
+  (when (and x y)
+    (let ((result))
+      (labels ((widget-in-bounds-p (widget x y)
+		 (let ((lx (widget-layout-x widget))
+		       (ly (widget-layout-y widget)))
+		   (and (<= (layout-offset lx) x (+ (layout-offset lx) (layout-size lx)))
+			(<= (layout-offset ly) y (+ (layout-offset ly) (layout-size ly))))))
+	       (rec (widget)
+		 (when (widget-in-bounds-p widget x y)
+		   (push widget result)
+		   (loop for child across (widget-children widget)
+			 do (rec child)))))
+	(rec root)
+	result))))
+
 
 (defun main0 (root-widget-func)
   ;; INIT
   (assert-ret (sdl3:init '(:video)))
   (let ((width 400)
-	(height 200))
+	(height 200)
+	(mouse-x nil)
+	(mouse-y nil))
     (multiple-value-bind (ret window renderer)
 	(sdl3:create-window-and-renderer "Leap Year" 400 200 '(:input-focus :mouse-focus :resizable))
       (assert-ret ret)
@@ -57,7 +96,7 @@
 	  ;; EVENT LOOP
 	  (unwind-protect
 	       (progn
-		 (setf root (funcall (root-widget width height root-widget-func)
+		 (setf root (funcall (root-widget width height root-widget-func (lambda () (inspect-widgets mouse-x mouse-y root)))
 				     nil context))
 		 (setf *root* root)
 		 (update-ui window renderer root context)
@@ -69,8 +108,13 @@
 		     (case (sdl3:%type event)
 		       (:window-resized (setf width (sdl3:%data-1 event)
 					      height (sdl3:%data-2 event)
-					      root (funcall (root-widget width height root-widget-func)
-							    nil context)))))
+					      root (funcall (root-widget width height root-widget-func (lambda () (inspect-widgets mouse-x mouse-y root)))
+							    nil context)))
+		       (:mouse-button-down
+			(if (and mouse-x mouse-y)
+			    (setf mouse-x nil mouse-y nil)
+			    (setf mouse-x (sdl3:%x event)
+				  mouse-y (sdl3:%y event))))))
 		   (if (eql (update-ui window renderer root context) :quit)
 		       (return))))
 
