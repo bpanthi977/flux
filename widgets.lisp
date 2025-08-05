@@ -39,7 +39,7 @@
 (defwidget button (name on-click)
   (:build
    (declare (ignorable name on-click))
-   (layout-set :flex.x 1.0
+   (layout-set :flex.x :least
 	       :padding.x 5.0
 	       :padding.y 20.0
 	       :alignment.x :start
@@ -49,13 +49,14 @@
 	   (sdl3:set-render-draw-color r 125 125 125 125)
 	   (sdl3:render-rect r (make-instance 'sdl3:frect :%h h :%w w :%y y :%x x))))
 
-(defwidget spacer-x ()
+(defwidget spacer ()
   (:build
-   (layout-set :flex.x 1.0)))
+   (layout-set :flex.x 1.0
+	       :flex.y 1.0)))
 
 (defwidget home-screen ()
   (:build
    (layout-set :flex.x 1.0)
    (list (button "Start!" (lambda () (print 'stopped)))
 	 (button "Stop!!" (lambda () (print 'started)))
-	 (spacer-x))))
+	 (spacer))))

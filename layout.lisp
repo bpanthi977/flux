@@ -6,7 +6,7 @@
   (minimum 0.0 :type single-float)
   (maximum most-positive-single-float :type single-float)
   (major-axisp t :type boolean)
-  (flex-value 0.0 :type single-float)
+  (flex-value 0.0 :type (or single-float (member :least)))
   (offset 0.0 :type single-float)
   (padding 0.0 :type single-float)
   (child-gap 0.0 :type single-float)
@@ -43,24 +43,34 @@ size = ∑   size(children) [If dimension is major axis]
 size = max size(children) [If dimension is minor aixs]"
   (unless (eql (layout-type el) :fixed)
     (setf (layout-size el) 0.0)
-    (flet ((compute (reduce-fn)
-	     (let* ((children-size
-		      (loop for child in children
-			    for l = (car child)
-			    with acc = 0.0
-			    when (not (eql (layout-alignment l) :relative))
-			      do (setf acc (funcall reduce-fn acc (layout-size l)))
-			    finally (return acc)))
-		    (fit-size (clamp-size el (+ children-size
-						(* 2 (layout-padding el))
+    (labels ((accumulate (reduce-fn accessor)
+	       (loop for child in children
+		     for l = (car child)
+		     with acc = 0.0d0
+		     when (not (eql (layout-alignment l) :relative))
+		       do (setf acc (funcall reduce-fn acc (funcall accessor l)))
+		     finally (return acc)))
+
+	     (compute (reduce-fn)
+	       (let* ((children-size (accumulate reduce-fn #'layout-size))
+		      (total-padding-and-gap (+ (* 2 (layout-padding el))
 						(or
 						 (and (layout-major-axisp el)
 						      (* (1- (length children))
 							 (layout-child-gap el)))
-						 0.0)))))
-	       (case (layout-type el)
-		 (:fit (setf (layout-size el) fit-size))
-		 (:flex (setf (layout-minimum el) fit-size))))))
+						 0.0)))
+		      (fit-size (clamp-size el (coerce (min most-positive-short-float
+							    (+ children-size total-padding-and-gap))
+						       'short-float))))
+		 (case (layout-type el)
+		   (:fit (setf (layout-size el) fit-size))
+		   (:flex (setf (layout-minimum el) fit-size)
+		    (when (eql (layout-flex-value el) :least)
+		      (setf (layout-maximum el)
+			    (coerce (min most-positive-single-float
+					 (clamp-size el (+ (accumulate reduce-fn #'layout-maximum)
+							   total-padding-and-gap)))
+				    'single-float))))))))
       (if (layout-major-axisp el)
 	  (compute #'+)
 	  (compute #'max)))))
@@ -74,14 +84,17 @@ size = max size(children) [If dimension is minor aixs]"
 4. Iterate until all remaining size is distributed."
   (let* ((flex-els (loop for child in children
 			 when (and (eql (layout-type (car child)) :flex)
-				   (not (= (layout-flex-value (car child)) 0.0)))
+				   (or (eql (layout-flex-value (car child)) :least)
+				       (not (= (layout-flex-value (car child)) 0.0))))
 			   collect (car child)))
 	 (remaining (remaining-size el children)))
     (flet ((flex-sum ()
 	     "Sum of all flex values in flex elements."
 	     (loop for el in flex-els
 		   when el
-		     summing (layout-flex-value el)))
+		     summing (if (eql (layout-flex-value el) :least)
+				 1.0
+				 (layout-flex-value el))))
 	   (remove-el (ref-cons value)
 	     "Set the size to `value' and remove from flex elements."
 	     (setf (layout-size (car ref-cons)) value)
@@ -90,7 +103,9 @@ size = max size(children) [If dimension is minor aixs]"
 
 	   (proportionate-size (el flex-sum remaining)
 	     "New size increment that can be assigned to an `el' by using remaining size."
-	     (* (/ (layout-flex-value el)
+	     (* (/ (if (eql (layout-flex-value el) :least)
+		       1.0
+		       (layout-flex-value el))
 		   flex-sum)
 		remaining)))
 
