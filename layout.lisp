@@ -52,7 +52,7 @@ size = max size(children) [If dimension is minor aixs]"
 		     finally (return acc)))
 
 	     (compute (reduce-fn)
-	       (let* ((children-size (accumulate reduce-fn #'layout-size))
+	       (let* ((children-size (accumulate reduce-fn (lambda (l) (max (layout-minimum l) (layout-size l)))))
 		      (total-padding-and-gap (+ (* 2 (layout-padding el))
 						(or
 						 (and (layout-major-axisp el)
