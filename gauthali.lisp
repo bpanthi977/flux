@@ -19,32 +19,22 @@
 	 ;; Mark all widgets as dirty
 	 (widget-rebuild-all root))))))
 
-(defun update-ui (window renderer root-widget context)
+(defun update-ui (window renderer root-widget root-widget-symbol context)
   (declare (ignorable window))
   ;; Clear display
   (let ((bg-color (context-get-property% context :bg-color)))
     (sdl3:set-render-draw-color renderer (aref bg-color 0) (aref bg-color 1) (aref bg-color 2) (aref bg-color 3)))
   (sdl3:render-clear renderer)
-  ;; Update display size
   (multiple-value-bind (ret w h) (sdl3:get-window-size window)
     (assert-ret ret)
-    (setf (layout-type (widget-layout-x root-widget)) :fixed)
-    (setf (layout-size (widget-layout-x root-widget)) (coerce w 'single-float))
-    (setf (layout-type (widget-layout-y root-widget)) :fixed)
-    (setf (layout-size (widget-layout-y root-widget)) (coerce h 'single-float)))
-  ;; Update widgets
-  (update-widget-tree root-widget context)
-  (update-widget-layouts root-widget)
-  ;; Render
-  (call-render-funcs root-widget renderer)
-  (sdl3:render-present renderer))
+    (setf root-widget
+	  (build-layout-render root-widget root-widget-symbol renderer context
+			       :x 0 :y 0 :w w :h h)))
+  (sdl3:render-present renderer)
+  root-widget)
 
 (defparameter *root* nil)
-(defwidget root-widget (child-widget-func)
-  (:build
-   (funcall child-widget-func)))
-
-(defun main0 (root-widget-func)
+(defun main0 (root-widget-symbol)
   ;; INIT
   (assert-ret (sdl3:init '(:video)))
   (let ((mouse-x nil)
@@ -60,24 +50,21 @@
 	(assert-ret (not (cffi:null-pointer-p font)))
 	(assert-ret (not (cffi:null-pointer-p text-engine)))
 
-	;; Init root widget
 	(let ((context (make-context))
-	      root)
+	      (root))
 	  (context-set-property% context :window window)
 	  (context-set-property% context :font font)
 	  (context-set-property% context :font-size 24.0)
 	  (context-set-property% context :render-scale 1.0)
 	  (context-set-property% context :text-engine text-engine)
-	  (context-set-property% context :bg-color #(0 0 0 255))
-	  (context-set-property% context :fg-color #(255 255 255 255))
+	  (context-set-property% context :bg-color #(255 255 255 255))
+	  (context-set-property% context :fg-color #(0 0 0 255))
 
 	  ;; EVENT LOOP
 	  (unwind-protect
 	       (progn
-		 (setf root (funcall (root-widget root-widget-func) nil context)
-		       *root* root)
-		 (update-ui window renderer root context)
-
+		 (setf root (update-ui window renderer root root-widget-symbol context))
+		 (setf *root* root)
 		 (loop for event = (sdl3:wait-event-timeout* 100) do
 		   (when event
 		     (if (typep event 'sdl3:quit-event)
@@ -89,8 +76,8 @@
 			    (setf mouse-x nil mouse-y nil)
 			    (setf mouse-x (sdl3:%x event)
 				  mouse-y (sdl3:%y event))))))
-		   (if (eql (update-ui window renderer root context) :quit)
-		       (return))))
+		   (setf root (update-ui window renderer root root-widget-symbol context))
+		   (setf *root* root)))
 
 	    ;; QUIT
 	    (sdl3-ttf:close-font font)
@@ -107,5 +94,4 @@
 (defun main ()
   (trivial-main-thread:with-body-in-main-thread (:blocking t)
     (float-features:with-float-traps-masked t
-      (main0 (lambda ()
-	       (home-screen))))))
+      (main0 'home-screen))))

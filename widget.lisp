@@ -221,6 +221,17 @@
 	     ;; Return widget (the same or the newly created one)
 	     ,widget))))))
 
+(declaim (inline create-widget))
+(defun create-widget (widget-initializer old-widget context)
+  "Calls the widget initializer function `widget-initializer'.
+
+Example:
+(defwidget button (text) ...) defines a widget called button.
+Calling (button \"Click Me\") actually returns a lambda that creates
+the widget. This is the widget initializer.
+
+`create-widget' calls that lambda with proper arguments."
+  (funcall widget-initializer old-widget context))
 
 (defmacro wrap-build (widget-form &body build)
   "Create a widget that overrides the build of the `widget'.
@@ -229,7 +240,7 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 	(context (gensym "context"))
 	(original-build (gensym "original-build")))
     `(lambda (,widget ,context)
-       (setf ,widget (funcall ,widget-form ,widget ,context))
+       (setf ,widget (create-widget ,widget-form ,widget ,context))
        (let ((,original-build (widget-build-function ,widget)))
 	 (setf (widget-build-function ,widget)
 	       (lambda (*widget* *context*)
@@ -272,7 +283,7 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 			  for child-widget-func in child-widget-funcs
 			  for child-old-widget = (when (< i old-length) (aref child-widgets i))
 			  do
-			     (let ((child-widget (funcall child-widget-func child-old-widget context)))
+			     (let ((child-widget (create-widget child-widget-func child-old-widget context)))
 			       (update-widget-tree child-widget context)
 			       (vector-push-extend child-widget child-widgets)))
 		    (context-restore context widget))
@@ -410,3 +421,46 @@ Returns :stop if any handler returned :stop, otherwise nil."
 				 return t))
 		 :stop)))
       (rec widget))))
+
+(defun build-layout-render (prev root-widget-symbol renderer context &key x y w h)
+  "Handle the build layout and render cycle of starting at root-widget.
+
+Pass the return value of this function in previous run as the first
+argument (`prev') to maintain state and continuity. This is the
+the root-widget with all its state and children.
+
+`root-widget-symbol' is symbol whose function value denotes the root
+widget.
+
+The layout of root-widget is set as per `x', `y', `w' and `h'."
+  (let ((version (get root-widget-symbol :gauthali.widget.version nil))
+	(root-widget prev))
+
+    ;; Initialize the root widget
+    (unless version
+      (error "~a doesn't denote a widget." root-widget-symbol))
+    (when (or (null root-widget)
+	      (not (= (widget-version root-widget) version)))
+      ;; The widget hasn't been build yet or the widget definition changed
+      (let* ((root-widget-def (symbol-function root-widget-symbol))
+	     (root-widget-initializer (funcall root-widget-def)))
+	(setf root-widget (create-widget root-widget-initializer root-widget context))))
+
+
+    ;; Set the layout of root widget
+    (setf (layout-type (widget-layout-x root-widget)) :fixed)
+    (setf (layout-type (widget-layout-y root-widget)) :fixed)
+
+    (setf (layout-size (widget-layout-x root-widget)) (coerce w 'single-float))
+    (setf (layout-size (widget-layout-y root-widget)) (coerce h 'single-float))
+
+    (setf (layout-offset (widget-layout-x root-widget)) (coerce x 'single-float))
+    (setf (layout-offset (widget-layout-y root-widget)) (coerce y 'single-float))
+
+    ;; Update widget tree
+    (update-widget-tree root-widget context)
+    ;; Compute layout of widget tree
+    (update-widget-layouts root-widget)
+    ;; Render
+    (call-render-funcs root-widget renderer)
+    root-widget))
