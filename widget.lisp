@@ -81,6 +81,9 @@
 		      alignment.x alignment.y))
   (error "You can use layout-set function only inside defwidget."))
 
+(defun widget-rebuild ()
+  (error "This can only be called from inside defwidget."))
+
 (defun destructure-defwidget-args (args)
   (let (state build on-layout-x on-layout-y render)
     (flet ((render-lambda-formp (form)
@@ -126,48 +129,50 @@
 	   ,decals
 	   (lambda (,widget ,context)
 	     (declare (ignorable ,context))
-	     ;; Create widget if necessary
-	     (unless (and ,widget (eql (widget-version ,widget) ,version))
+	     ;; TODO: Create widget if necessary
+	     ;; only when :memo says so
+	     (macrolet ((widget-rebuild ()
+			  `(setf (widget-dirty ,',widget) t)))
 	       (symbol-macrolet (,@(loop for i from 0
 					 for binding in state
 					 for var = (if (listp binding) (first binding) binding)
 					 collect (list var `(aref (widget-state ,widget) ,i))))
 		 (setf ,widget (make-widget
-			      :name ',name
-			      :version ,version
-			      :dirty t
-			      :state (make-array ,(length state) :initial-element nil)
-			      :build-function
-			      (lambda (,widget ,context)
-				(declare (ignorable ,widget ,context))
-				;; Set build function
-				(setf (fill-pointer (widget-properties ,widget)) 0)
-				(macrolet ((property-set (property value)
-					     `(vector-push-extend (cons ,property ,value) (widget-properties ,',widget)))
-					   (property-get (property &optional default)
-					     `(context-get-property% ,',context ,property ,default))
-					   (layout-set (&rest keyword-args)
-					     `(layout-set% ,',widget ,@keyword-args)))
-				  ,@build))
-			      :on-layout-x-function
-			      ,(when on-layout-x
-				 `(macrolet ((layout-set (&rest keyword-args)
+				:name ',name
+				:version ,version
+				:dirty t
+				:state (make-array ,(length state) :initial-element nil)
+				:build-function
+				(lambda (,widget ,context)
+				  (declare (ignorable ,widget ,context))
+				  ;; Set build function
+				  (setf (fill-pointer (widget-properties ,widget)) 0)
+				  (macrolet ((property-set (property value)
+					       `(vector-push-extend (cons ,property ,value) (widget-properties ,',widget)))
+					     (property-get (property &optional default)
+					       `(context-get-property% ,',context ,property ,default))
+					     (layout-set (&rest keyword-args)
 					       `(layout-set% ,',widget ,@keyword-args)))
-				    (lambda (,widget ,@(first on-layout-x))
+				    ,@build))
+				:on-layout-x-function
+				,(when on-layout-x
+				   `(macrolet ((layout-set (&rest keyword-args)
+						 `(layout-set% ,',widget ,@keyword-args)))
+				      (lambda (,widget ,@(first on-layout-x))
+					(declare (ignorable ,widget))
+					,@(rest on-layout-x))))
+				:on-layout-y-function
+				,(when on-layout-y
+				   `(macrolet ((layout-set (&rest keyword-args)
+						 `(layout-set% ,',widget ,@keyword-args)))
+				      (lambda (,widget ,@(first on-layout-y))
+					(declare (ignorable ,widget))
+					,@(rest on-layout-y))))
+				:render-function
+				,(when render
+				   `(lambda (,widget ,@(first render))
 				      (declare (ignorable ,widget))
-				      ,@(rest on-layout-x))))
-			      :on-layout-y-function
-			      ,(when on-layout-y
-				 `(macrolet ((layout-set (&rest keyword-args)
-					       `(layout-set% ,',widget ,@keyword-args)))
-				    (lambda (,widget ,@(first on-layout-y))
-				      (declare (ignorable ,widget))
-				      ,@(rest on-layout-y))))
-			      :render-function
-			      ,(when render
-				 `(lambda (,widget ,@(first render))
-				    (declare (ignorable ,widget))
-				    ,@(rest render)))))
+				      ,@(rest render)))))
 		 ;; Initialize variables
 		 ,@(loop for binding in state
 			 for i from 0
@@ -183,25 +188,30 @@
 (defun update-widget-tree (widget context)
   (cond ((or (widget-dirty widget)
 	     (some #'recompiledp (widget-children widget)))
-	 (setf (widget-dirty widget) nil)
+	 (let ((errored t))
+	   (unwind-protect
+		(progn
+		  (setf (widget-dirty widget) nil)
+		  (let* ((child-widgets (widget-children widget))
+			 (old-length (length child-widgets))
+			 (child-widgets-func (uiop:ensure-list (funcall (widget-build-function widget) widget context))))
 
-	 (let* ((child-widgets (widget-children widget))
-		(old-length (length child-widgets))
-		(child-widgets-func (uiop:ensure-list (funcall (widget-build-function widget) widget context))))
+		    (context-setup context widget)
 
-	   (context-setup context widget)
+		    ;; Update widget-children
+		    (setf (fill-pointer child-widgets) 0)
+		    (loop for i from 0
+			  for child-widget-func in child-widgets-func
+			  for child-old-widget = (when (< i old-length) (aref child-widgets i))
+			  do
+			     (let ((child-widget (funcall child-widget-func child-old-widget context)))
+			       (update-widget-tree child-widget context)
+			       (vector-push-extend child-widget child-widgets)))
 
-	   ;; Update widget-children
-	   (setf (fill-pointer child-widgets) 0)
-	   (loop for i from 0
-		 for child-widget-func in child-widgets-func
-		 for child-old-widget = (when (< i old-length) (aref child-widgets i))
-		 do
-		    (let ((child-widget (funcall child-widget-func child-old-widget context)))
-		      (update-widget-tree child-widget context)
-		      (vector-push-extend child-widget child-widgets)))
-
-	   (context-restore context widget)))
+		    (context-restore context widget))
+		  (setf errored nil))
+	     (when errored
+	       (setf (widget-dirty widget) t)))))
 	(t ;; widget is not dirty but the children might be
 	 (context-setup context widget)
 	 (loop for child-widget across (widget-children widget) do
