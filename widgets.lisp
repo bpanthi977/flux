@@ -49,7 +49,7 @@
 		 :%a (aref color 3)))
 
 (defwidget text-lcd (text)
-  (:state (update t) _text font surface texture fg bg render-scale width height)
+  (:state (update t) _text font surface texture fg bg render-scale max-width min-height width height)
   (:build
    ;; Compute layout ranges
    ;; no further children widgets
@@ -68,12 +68,14 @@
 
      (multiple-value-bind (ret w h) (sdl3-ttf:get-string-size font text 0)
        (assert-ret ret)
-       (setf width (/ (coerce w 'single-float) render-scale))
-       (setf height (/ (coerce h 'single-float) render-scale))))
+       (setf max-width (/ (coerce w 'single-float) render-scale)
+	     width max-width)
+       (setf min-height (/ (coerce h 'single-float) render-scale)
+	     height min-height)))
 
    (layout-set :flex.x 1.0
-	       :width.max width
-	       :height.min height)
+	       :width.max max-width
+	       :height.min min-height)
    nil)
 
   (:on-layout-x (x w)
@@ -155,15 +157,28 @@
 					   (widget-rebuild)))
 					delta)))))
 
+(defwidget row (layout-args &rest widgets)
+  (:build
+   (apply #'layout-set layout-args)
+   widgets))
+
 (defwidget home-screen ()
   (:build
-   (layout-set :flex.x 1.0)
-   (list (layout (:width.min 150.0
-		  :padding.x 5.0
-		  :padding.y 20.0)
-		 (button "Start!!" (lambda () (print "Start clicked!"))))
-	 (layout (:width.min 150.0
-		  :padding.x 5.0
-		  :padding.y 20.0)
-		 (button "Stop!!" (lambda () (print "Stop clicked!"))))
-	 (countdown))))
+   (layout-set :flex.x 1.0
+	       :flex.y 1.0
+	       :alignment.x :center
+	       :alignment.y :center)
+   (list (row '(:flex.x 1.0))
+	 (row '(:flex.x 1.0)
+	      (layout (:width.min 150.0
+		       :padding.x 5.0
+		       :padding.y 20.0)
+		(button "Start!!" (lambda () (print "Start clicked!"))))
+	      (layout (:width.min 150.0
+		       :padding.x 5.0
+		       :padding.y 20.0)
+		(button "Stop!!" (lambda () (print "Stop clicked!")))))
+	 (row '(:alignment.x :end
+		:width.min 100.0
+		:flex.x 1.0)
+	      (countdown)))))
