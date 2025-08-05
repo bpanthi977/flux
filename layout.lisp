@@ -10,16 +10,17 @@
   (offset 0.0 :type single-float)
   (padding 0.0 :type single-float)
   (child-gap 0.0 :type single-float)
-  (alignment :start :type (member :start :center :end)))
+  (alignment :start :type (member :start :center :end))
+  (scratchpad (make-array 2 :element-type 'single-float) :type (simple-array single-float (2))))
 
-(defun traverse-bfs (fn root)
+(defun traverse-dfs (fn root)
   (funcall fn (car root) (cdr root))
   (loop for el in (cdr root) do
-	(traverse-bfs fn el)))
+	(traverse-dfs fn el)))
 
-(defun traverse-reverse-bfs (fn root)
+(defun traverse-reverse-dfs (fn root)
   (loop for el in (cdr root) do
-	(traverse-reverse-bfs fn el))
+	(traverse-reverse-dfs fn el))
   (funcall fn (car root) (cdr root)))
 
 (defun clamp-size (el size)
@@ -169,8 +170,20 @@ size = max size(children) [If dimension is minor aixs]"
 		       (:center (- (/ (layout-size el) 2)
 				   (/ child-size 2)))))))))
 
+(defun save-min-max (layout children)
+  (declare (ignore children))
+  (setf (aref (layout-scratchpad layout) 0) (layout-minimum layout)
+	(aref (layout-scratchpad layout) 1) (layout-maximum layout)))
+
+(defun restore-min-max (layout children)
+  (declare (ignore children))
+  (setf (layout-minimum layout) (aref (layout-scratchpad layout) 0)
+	(layout-maximum layout) (aref (layout-scratchpad layout) 1)))
+
 (defun solve-layout-tree (layout-tree)
-  (traverse-reverse-bfs #'compute-fit-size  layout-tree)
-  (traverse-bfs         #'compute-flex-size layout-tree)
-  (traverse-bfs         #'compute-offset    layout-tree)
+  (traverse-dfs #'save-min-max layout-tree)
+  (traverse-reverse-dfs #'compute-fit-size  layout-tree)
+  (traverse-dfs         #'compute-flex-size layout-tree)
+  (traverse-dfs         #'compute-offset    layout-tree)
+  (traverse-dfs #'restore-min-max layout-tree)
   layout-tree)
