@@ -60,9 +60,6 @@
 	     (widget-rebuild)))))
 
    (layout-set :flex.x :least
-	       :width.min 150.0
-	       :padding.x 5.0
-	       :padding.y 20.0
 	       :alignment.x :center
 	       :alignment.y :center)
    (text name))
@@ -101,7 +98,13 @@
 (defwidget home-screen ()
   (:build
    (layout-set :flex.x 1.0)
-   (list (button "Start!" (lambda () (print "Start clicked!")))
-	 (button "Stop!!" (lambda () (print "Stop clicked!")))
+   (list (layout (:width.min 150.0
+		  :padding.x 5.0
+		  :padding.y 20.0)
+		 (button "Start!!" (lambda () (print "Start clicked!"))))
+	 (layout (:width.min 150.0
+		  :padding.x 5.0
+		  :padding.y 20.0)
+		 (button "Stop!!" (lambda () (print "Stop clicked!"))))
 	 (spacer)
 	 (countdown))))

@@ -78,20 +78,19 @@
     (error "property-get macro can be called only inside defwidget definition in :build."))
   `(context-get-property% ,*context-symbol* ,property ,default))
 
-(defmacro layout-set (&rest keyword-args
-		      &key major-axis
-			width width.min width.max flex.x
-			height height.min height.max flex.y
-			padding padding.x padding.y
-			child-gap child-gap.x child-gap.y
-			alignment.x alignment.y)
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *layout-set-keys* '(major-axis
+				    width width.min width.max flex.x
+				    height height.min height.max flex.y
+				    padding padding.x padding.y
+				    child-gap child-gap.x child-gap.y
+				    alignment.x alignment.y)))
+(eval-when (:compile-toplevel :load-toplevel :execute)
+  (defparameter *layout-set-arg* `(&rest keyword-args
+					 &key ,@*layout-set-keys*)))
+(defmacro layout-set #.*layout-set-arg*
   "Set layout values."
-  (declare (ignorable major-axis
-		      width width.min width.max flex.x
-		      height height.min height.max flex.y
-		      padding padding.x padding.y
-		      child-gap child-gap.x child-gap.y
-		      alignment.x alignment.y))
+  (declare #.`(ignorable ,@*layout-set-keys*))
   (unless *allow-widget-access*
     (error "You can use layout-set function only inside defwidget."))
   `(layout-set% ,*widget-symbol* ,@keyword-args))
@@ -217,6 +216,31 @@
 	     ;; Return widget (the same or the newly created one)
 	     ,widget))))))
 
+(defmacro wrap-after (widget-form &body after-body-forms)
+  (let ((widget (gensym "widget-me"))
+	(widget-wrapped (gensym "widget-wrapped"))
+	(context (gensym "context"))
+	(build-func (gensym "build-func")))
+    (let ((*widget-symbol* widget)
+	  (*context-symbol* context)
+	  (*allow-widget-access* t)
+	  (*allow-context-access* t))
+      `(let ((,widget-wrapped ,widget-form))
+	 (lambda (,widget ,context)
+	   (let* ((,widget (funcall ,widget-wrapped ,widget ,context))
+		  (,build-func (widget-build-function ,widget)))
+	     (setf (widget-build-function ,widget)
+		   (lambda (,widget ,context)
+		     (prog1 (funcall ,build-func ,widget ,context)
+		       ,(trivial-macroexpand-all:macroexpand-all
+			 `(progn ,@after-body-forms)))))
+	     ,widget))))))
+
+(defmacro layout (#.`(&rest keyword-args &key ,@*layout-set-keys*) &body widget-form)
+  (declare #.`(ignorable ,@*layout-set-keys*))
+  `(wrap-after (progn ,@widget-form)
+     (layout-set ,@keyword-args)))
+
 (defun recompiledp (widget)
   (not (eql (widget-version widget)
 	    (get (widget-name widget) ':gauthali.widget.version))))
@@ -253,6 +277,7 @@
 	 (loop for child-widget across (widget-children widget) do
 	       (update-widget-tree child-widget context))
 	 (context-restore context widget))))
+
 
 (defun layout-set% (widget
 		    &key major-axis
