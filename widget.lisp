@@ -44,9 +44,10 @@
   (name nil)
   (version 0 :type fixnum)
   (build-function nil :type (or null (function (widget context))))
-  (render-function nil :type (or null (function (widget t float float float float))))
   (on-layout-x-function nil :type (or null (function (widget float float))))
   (on-layout-y-function nil :type (or null (function (widget float float))))
+  (render-function nil :type (or null (function (widget t float float float float))))
+  (cleanup-function nil :type (or null (function (widget))))
   (dirty nil :type boolean)
   (id nil)
   (parent nil)
@@ -110,7 +111,7 @@
   (vector-push-extend (cons (find-class event-class-symbol) handler) (widget-event-handlers *widget*)))
 
 (defun destructure-defwidget-args (args)
-  (let (state build on-layout-x on-layout-y render)
+  (let (state build on-layout-x on-layout-y render cleanup)
     (flet ((render-lambda-formp (form)
 	     (and (= 5 (length form))
 		  (every #'symbolp form)))
@@ -119,8 +120,8 @@
 		  (every #'symbolp form))))
       (loop for clause in args do
 	(cond ((or (not (listp clause))
-		   (not (member (first clause) '(:state :build :on-layout-x :on-layout-y :render))))
-	       (error "~a not a list beginning with :state, :build, :on-layout-x, :on-layout-y:render." clause))
+		   (not (member (first clause) '(:state :build :on-layout-x :on-layout-y :render :cleanup))))
+	       (error "~a not a list beginning with :state, :build, :on-layout-x, :on-layout-y, :render or :cleanup." clause))
 	      (t
 	       (case (first clause)
 		 (:state (setf state (rest clause)))
@@ -136,8 +137,10 @@
 		 (:render
 		  (unless (render-lambda-formp (second clause))
 		    (error ":render clause must have following form: (:render (renderer x y w h) &body body)."))
-		  (setf render (rest clause))))))))
-    (values state build on-layout-x on-layout-y render)))
+		  (setf render (rest clause)))
+		 (:cleanup
+		  (setf cleanup (rest clause))))))))
+    (values state build on-layout-x on-layout-y render cleanup)))
 
 (defun defwidget-create-lambda (args-and-body)
   (destructuring-bind (args . body) args-and-body
@@ -161,7 +164,7 @@
 	(context (gensym "context"))
 	(version (1+ (get name :gauthali.widget.version -1))))
     (setf (get name :gauthali.widget.version) version)
-    (multiple-value-bind (state build on-layout-x on-layout-y render)
+    (multiple-value-bind (state build on-layout-x on-layout-y render cleanup)
 	(destructure-defwidget-args args)
       (let* ((decals (if (and (listp build) (listp (first build)) (eql (first (first build)) 'declare))
 			 (first build)))
@@ -176,6 +179,10 @@
 				       for binding in state
 				       for var = (if (listp binding) (first binding) binding)
 				       collect (list var `(aref (widget-state ,widget) ,i))))
+	       (when (and ,widget
+			  (not use-old)
+			  (widget-cleanup-function ,widget))
+		   (funcall (widget-cleanup-function ,widget) ,widget))
 	       (setf ,widget (make-widget
 			      :name ',name
 			      :version ,version
@@ -199,7 +206,10 @@
 
 			      :render-function
 			      ,(when render
-				 (defwidget-create-lambda render))))
+				 (defwidget-create-lambda render))
+			      :cleanup-function
+			      ,(when cleanup
+				 (defwidget-create-lambda `(() ,@cleanup)))))
 	       ;; Initialize variables
 	       (let ((*widget* ,widget)
 		     (*context* ,context))

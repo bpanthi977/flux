@@ -46,6 +46,9 @@
 		    (declare (ignore w))
 		    (assert-ret ret)
 		    (setf height (/ (coerce h 'single-float) render-scale))
+		    (when surface
+		      (sdl3:destroy-surface surface)
+		      (setf surface nil))
 		    (setf surface (sdl3-ttf:render-text-lcd-wrapped font _text 0 (sdl3-color fg) (sdl3-color bg) (floor (* render-scale width))))))
 
 		(layout-set :height.min height))
@@ -60,7 +63,12 @@
 		 (sdl3:set-render-scale r 1.0 1.0))
 	     (sdl3:render-texture r texture nil (make-instance 'sdl3:frect :%x (* sx x) :%y (* sy y) :%w (* w sx) :%h (* h sy)))
 	     (when (and (= sx sy) (not (= sx 1.0)))
-	       (sdl3:set-render-scale r sx sy)))))
+	       (sdl3:set-render-scale r sx sy))))
+  (:cleanup
+   (when texture
+     (sdl3:destroy-texture texture))
+   (when surface
+     (sdl3:destroy-surface surface))))
 
 (defwidget button (name on-press)
   (:state pressed)
@@ -104,17 +112,7 @@
    (text (format nil "~,3f" (seconds-elapsed mount-time))))
   (:render (r x y w h)
 	   (declare (ignore r x y w h))
-	   (if (not refresh-time)
-	       (setf refresh-time (get-internal-real-time)))
-	   (let ((delta (- 0.1 (seconds-elapsed refresh-time))))
-	     (if (< delta 0)
-		 (progn (setf refresh-time (get-internal-real-time))
-			(widget-rebuild))
-		 (sb-ext:schedule-timer (sb-ext:make-timer
-					 (callback ()
-					   (setf refresh-time (get-internal-real-time))
-					   (widget-rebuild)))
-					delta)))))
+	   (widget-rebuild )))
 
 (defwidget row (layout-args &rest widgets)
   (:build
