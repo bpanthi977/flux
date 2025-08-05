@@ -7,5 +7,9 @@
   (when (null return-value)
     (error "Error: ~a" (sdl3:get-error))))
 
-(defun color (r g b a)
-  (make-instance 'sdl3:color :%r r :%g g :%b b :%a a))
+(defun sdl3-color (color)
+  (make-instance 'sdl3:color
+		 :%r (aref color 0)
+		 :%g (aref color 1)
+		 :%b (aref color 2)
+		 :%a (aref color 3)))

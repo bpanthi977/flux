@@ -11,5 +11,10 @@
 	       (:file "utils")
 	       (:file "layout")
 	       (:file "widget")
-	       (:file "widgets")
+	       (:module "widgets"
+			:serial t
+			:components ((:file "core")
+				     (:file "text")
+				     (:file "button")))
+	       (:file "screens")
                (:file "gauthali")))
