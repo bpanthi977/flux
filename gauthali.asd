@@ -6,7 +6,7 @@
   :license  "MIT"
   :version "2.0.0"
   :serial t
-  :depends-on (#:sdl3 #:alexandria #:trivial-garbage #:anaphora)
+  :depends-on (#:sdl3 #:alexandria #:trivial-garbage #:trivial-macroexpand-all #:anaphora)
   :components ((:file "package")
 	       (:file "utils")
 	       (:file "layout")
