@@ -15,11 +15,9 @@
 	 (context-set-property% context :render-scale display-scale)
 	 (sdl3:set-render-scale renderer display-scale display-scale)
 	 (sdl3-ttf:set-font-size (context-get-property% context :font)
-				 (* (context-get-property% context :font-size) display-scale))))
-      (:window-resized
-       (setf (layout-size (widget-layout-x root)) (coerce (sdl3:%data-1 event) 'single-float)
-	     (layout-size (widget-layout-y root)) (coerce (sdl3:%data-2 event) 'single-float))))))
-
+				 (* (context-get-property% context :font-size) display-scale))
+	 ;; Mark all widgets as dirty
+	 (widget-rebuild-all root))))))
 
 (defun update-ui (window renderer root-widget context)
   (declare (ignorable window))
@@ -27,6 +25,13 @@
   (let ((bg-color (context-get-property% context :bg-color)))
     (sdl3:set-render-draw-color renderer (aref bg-color 0) (aref bg-color 1) (aref bg-color 2) (aref bg-color 3)))
   (sdl3:render-clear renderer)
+  ;; Update display size
+  (multiple-value-bind (ret w h) (sdl3:get-window-size window)
+    (assert-ret ret)
+    (setf (layout-type (widget-layout-x root-widget)) :fixed)
+    (setf (layout-size (widget-layout-x root-widget)) (coerce w 'single-float))
+    (setf (layout-type (widget-layout-y root-widget)) :fixed)
+    (setf (layout-size (widget-layout-y root-widget)) (coerce h 'single-float)))
   ;; Update widgets
   (update-widget-tree root-widget context)
   (update-widget-layouts root-widget)
@@ -35,57 +40,14 @@
   (sdl3:render-present renderer))
 
 (defparameter *root* nil)
-
-(defwidget root-widget (width height child-widget-func inspect-func)
-  (:state (prev-print))
+(defwidget root-widget (child-widget-func)
   (:build
-   (layout-set :width (coerce width 'float)
-	       :height (coerce height 'float))
-   (funcall child-widget-func))
-  (:render (r x y w h)
-	   (declare (ignorable x y w h))
-	   (let ((widgets (funcall inspect-func)))
-	     (unless widgets
-	       (setf prev-print nil))
-	     (loop for widget in widgets
-		   for lx = (widget-layout-x widget)
-		   for ly = (widget-layout-y widget) do
-		     (unless prev-print
-		       (format t "~a~%  ~a~%  ~a~%"
-				      (widget-name widget)
-				      lx ly))
-		     (sdl3:set-render-draw-color r 255 0 0 255)
-		     (sdl3:render-rect r (make-instance 'sdl3:frect
-							:%x (layout-offset lx) :%w (layout-size lx)
-							:%y (layout-offset ly) :%h (layout-size ly))))
-	     (when widgets
-	       (setf prev-print t)))))
-
-
-(defparameter *enable-inspect* nil)
-(defun inspect-widgets (x y root)
-  (when (and x y *enable-inspect*)
-    (let ((result))
-      (labels ((widget-in-bounds-p (widget x y)
-		 (let ((lx (widget-layout-x widget))
-		       (ly (widget-layout-y widget)))
-		   (and (<= (layout-offset lx) x (+ (layout-offset lx) (layout-size lx)))
-			(<= (layout-offset ly) y (+ (layout-offset ly) (layout-size ly))))))
-	       (rec (widget)
-		 (when (widget-in-bounds-p widget x y)
-		   (push widget result)
-		   (loop for child across (widget-children widget)
-			 do (rec child)))))
-	(rec root)
-	result))))
-
+   (funcall child-widget-func)))
 
 (defun main0 (root-widget-func)
   ;; INIT
   (assert-ret (sdl3:init '(:video)))
-  (let ((width 400)
-	(height 200)
-	(mouse-x nil)
+  (let ((mouse-x nil)
 	(mouse-y nil))
     (multiple-value-bind (ret window renderer)
 	(sdl3:create-window-and-renderer "Leap Year" 400 200 '(:input-focus :mouse-focus :resizable :high-pixel-density))
@@ -112,10 +74,10 @@
 	  ;; EVENT LOOP
 	  (unwind-protect
 	       (progn
-		 (setf root (funcall (root-widget width height root-widget-func (lambda () (inspect-widgets mouse-x mouse-y root)))
-				     nil context))
-		 (setf *root* root)
+		 (setf root (funcall (root-widget root-widget-func) nil context)
+		       *root* root)
 		 (update-ui window renderer root context)
+
 		 (loop for event = (sdl3:wait-event-timeout* 100) do
 		   (when event
 		     (if (typep event 'sdl3:quit-event)

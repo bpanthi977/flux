@@ -276,6 +276,14 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 	       (update-widget-tree child-widget context))
 	 (context-restore context widget))))
 
+(defun widget-rebuild-all (widget)
+  "Marks all widgets for rebuild."
+  (labels ((rec (w)
+	     (setf (widget-dirty w) t)
+	     (loop for child across (widget-children w) do
+	       (rec child))))
+    (rec widget)))
+
 
 (defun layout-set% (widget
 		    &key major-axis
