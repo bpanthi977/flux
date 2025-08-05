@@ -1,20 +1,31 @@
 (require 'sdl3)
 (in-package #:gauthali)
 
-(defun handle-event (event root)
+(defun handle-event (event root context renderer)
   (unless (eql (call-event-handlers root event) :stop)
     (typecase event
       (sdl3:keyboard-event
        (case (sdl3:%key event)
 	 (:q (cffi:with-foreign-object (ev '(:struct sdl3:quit-event))
 	       (setf (cffi:foreign-slot-value ev '(:struct sdl3:quit-event) 'sdl3:%type) :quit)
-	       (sdl3:push-event ev))))))))
+	       (sdl3:push-event ev))))))
+    (case (sdl3:%type event)
+      (:window-display-scale-changed
+       (let ((display-scale (sdl3:get-window-display-scale (sdl3:get-window-from-id (sdl3:%window event)))))
+	 (context-set-property% context :render-scale display-scale)
+	 (sdl3:set-render-scale renderer display-scale display-scale)
+	 (sdl3-ttf:set-font-size (context-get-property% context :font)
+				 (* (context-get-property% context :font-size) display-scale))))
+      (:window-resized
+       (setf (layout-size (widget-layout-x root)) (coerce (sdl3:%data-1 event) 'single-float)
+	     (layout-size (widget-layout-y root)) (coerce (sdl3:%data-2 event) 'single-float))))))
 
 
 (defun update-ui (window renderer root-widget context)
   (declare (ignorable window))
   ;; Clear display
-  (sdl3:set-render-draw-color renderer 0 0 0 0)
+  (let ((bg-color (context-get-property% context :bg-color)))
+    (sdl3:set-render-draw-color renderer (aref bg-color 0) (aref bg-color 1) (aref bg-color 2) (aref bg-color 3)))
   (sdl3:render-clear renderer)
   ;; Update widgets
   (update-widget-tree root-widget context)
@@ -32,7 +43,7 @@
 	       :height (coerce height 'float))
    (funcall child-widget-func))
   (:render (r x y w h)
-	   (declare (ignore x y w h))
+	   (declare (ignorable x y w h))
 	   (let ((widgets (funcall inspect-func)))
 	     (unless widgets
 	       (setf prev-print nil))
@@ -77,7 +88,7 @@
 	(mouse-x nil)
 	(mouse-y nil))
     (multiple-value-bind (ret window renderer)
-	(sdl3:create-window-and-renderer "Leap Year" 400 200 '(:input-focus :mouse-focus :resizable))
+	(sdl3:create-window-and-renderer "Leap Year" 400 200 '(:input-focus :mouse-focus :resizable :high-pixel-density))
       (assert-ret ret)
       (sdl3:raise-window window)
       ;; Init font
@@ -92,7 +103,11 @@
 	      root)
 	  (context-set-property% context :window window)
 	  (context-set-property% context :font font)
+	  (context-set-property% context :font-size 24.0)
+	  (context-set-property% context :render-scale 1.0)
 	  (context-set-property% context :text-engine text-engine)
+	  (context-set-property% context :bg-color #(0 0 0 255))
+	  (context-set-property% context :fg-color #(255 255 255 255))
 
 	  ;; EVENT LOOP
 	  (unwind-protect
@@ -105,12 +120,8 @@
 		   (when event
 		     (if (typep event 'sdl3:quit-event)
 			 (return))
-		     (handle-event event root)
+		     (handle-event event root context renderer)
 		     (case (sdl3:%type event)
-		       (:window-resized (setf width (sdl3:%data-1 event)
-					      height (sdl3:%data-2 event)
-					      root (funcall (root-widget width height root-widget-func (lambda () (inspect-widgets mouse-x mouse-y root)))
-							    nil context)))
 		       (:mouse-button-down
 			(if (and mouse-x mouse-y)
 			    (setf mouse-x nil mouse-y nil)

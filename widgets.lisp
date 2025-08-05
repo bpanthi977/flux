@@ -41,6 +41,66 @@
 	   (sdl3-ttf:set-text-wrap-width ttf-text (floor w))
 	   (sdl3-ttf:draw-renderer-text ttf-text x y)))
 
+(defun sdl3-color (color)
+  (make-instance 'sdl3:color
+		 :%r (aref color 0)
+		 :%g (aref color 1)
+		 :%b (aref color 2)
+		 :%a (aref color 3)))
+
+(defwidget text-lcd (text)
+  (:state (update t) _text font surface texture fg bg render-scale width height)
+  (:build
+   ;; Compute layout ranges
+   ;; no further children widgets
+   (setf font (property-get :font))
+
+   ;; Compute properties if cache is invalid
+   (when (or (not (string-equal _text text))
+	     (not (equal fg (property-get :fg-color)))
+	     (not (equal bg (property-get :bg-color)))
+	     (not (= render-scale (property-get :render-scale))))
+     (setf update t
+	   _text text
+	   bg (property-get :bg-color)
+	   fg (property-get :fg-color)
+	   render-scale (property-get :render-scale))
+
+     (multiple-value-bind (ret w h) (sdl3-ttf:get-string-size font text 0)
+       (assert-ret ret)
+       (setf width (/ (coerce w 'single-float) render-scale))
+       (setf height (/ (coerce h 'single-float) render-scale))))
+
+   (layout-set :flex.x 1.0
+	       :width.max width
+	       :height.min height)
+   nil)
+
+  (:on-layout-x (x w)
+		(declare (ignore x))
+		(when (or update
+			  (not (eql width w)))
+		  (setf width w)
+		  (multiple-value-bind (ret w h) (sdl3-ttf:get-string-size-wrapped font text 0 (floor (* render-scale width)))
+		    (declare (ignore w))
+		    (assert-ret ret)
+		    (setf height (/ (coerce h 'single-float) render-scale))
+		    (setf surface (sdl3-ttf:render-text-lcd-wrapped font _text 0 (sdl3-color fg) (sdl3-color bg) (floor (* render-scale width))))))
+
+		(layout-set :height.min height))
+  (:render (r x y w h)
+	   (when update
+	     (setf update nil)
+	     (when texture (sdl3:destroy-texture texture))
+	     (setf texture (sdl3:create-texture-from-surface r surface)))
+	   (multiple-value-bind (ret sx sy) (sdl3:get-render-scale r)
+	     (assert-ret ret)
+	     (when (and (= sx sy) (not (= sx 1.0)))
+		 (sdl3:set-render-scale r 1.0 1.0))
+	     (sdl3:render-texture r texture nil (make-instance 'sdl3:frect :%x (* sx x) :%y (* sy y) :%w (* w sx) :%h (* h sy)))
+	     (when (and (= sx sy) (not (= sx 1.0)))
+	       (sdl3:set-render-scale r sx sy)))))
+
 (defwidget button (name on-press)
   (:state pressed)
   (:build
@@ -62,7 +122,7 @@
    (layout-set :flex.x :least
 	       :alignment.x :center
 	       :alignment.y :center)
-   (text name))
+   (text-lcd name))
   (:render (r x y w h)
 	   (sdl3:set-render-draw-color r 125 125 125 125)
 	   (sdl3:render-rect r (make-instance 'sdl3:frect :%h h :%w w :%y y :%x x))))
@@ -80,12 +140,12 @@
 	  refresh-time)
   (:build
    (layout-set :flex.x :least)
-   (text (format nil "~,3f" (seconds-elapsed mount-time))))
+   (text-lcd (format nil "~,3f" (seconds-elapsed mount-time))))
   (:render (r x y w h)
 	   (declare (ignore r x y w h))
 	   (if (not refresh-time)
 	       (setf refresh-time (get-internal-real-time)))
-	   (let ((delta (- .1 (seconds-elapsed refresh-time))))
+	   (let ((delta (- 0.1 (seconds-elapsed refresh-time))))
 	     (if (< delta 0)
 		 (progn (setf refresh-time (get-internal-real-time))
 			(widget-rebuild))
@@ -106,5 +166,4 @@
 		  :padding.x 5.0
 		  :padding.y 20.0)
 		 (button "Stop!!" (lambda () (print "Stop clicked!"))))
-	 (spacer)
 	 (countdown))))
