@@ -57,26 +57,22 @@
   (event-handlers (make-array 0 :fill-pointer 0 :adjustable t))
   (children (make-array 0 :fill-pointer 0 :adjustable t)))
 
-(defvar *widget-symbol* nil
-  "Symbol currently being used for widget during macroexpansion of defwidget.")
-(defvar *context-symbol* nil
-  "Symbol currently being used for context during macroexpansion of defwidget.")
-(defparameter *allow-widget-access* nil
-  "Is accessing widget symbol allowed during this macroexpansion time.")
-(defparameter *allow-context-access* nil
-  "Is accessing context symbol allowed during this macroexpansion time.")
+(defvar *widget* nil
+  "Current Widget dynamically bound while calling functions defined in defwidget.")
+(defvar *context* nil
+  "Current Context dynamically bound while calling functions defined in defwidget.")
 
-(defmacro property-set (property value)
+(defun property-set (property value)
   "Set the property value for children widgets."
-  (unless (and *allow-widget-access* *allow-context-access*)
-    (error "property-get macro can be called only inside defwidget definition in :build."))
-  `(vector-push-extend (cons ,property ,value) (widget-properties ,*widget-symbol*)))
+  (unless (and *widget* *context*)
+    (error "property-get can be called only inside defwidget definition in :build."))
+  (vector-push-extend (cons property value) (widget-properties *widget*)))
 
-(defmacro property-get (property &optional default)
+(defun property-get (property &optional default)
   "Get the property value set by parent/ancestor widgets."
-  (unless (and *allow-widget-access* *allow-context-access*)
+  (unless (and *widget* *context*)
     (error "property-get macro can be called only inside defwidget definition in :build."))
-  `(context-get-property% ,*context-symbol* ,property ,default))
+  (context-get-property% *context* property default))
 
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *layout-set-keys* '(major-axis
@@ -88,30 +84,30 @@
 (eval-when (:compile-toplevel :load-toplevel :execute)
   (defparameter *layout-set-arg* `(&rest keyword-args
 					 &key ,@*layout-set-keys*)))
-(defmacro layout-set #.*layout-set-arg*
+(defun layout-set #.*layout-set-arg*
   "Set layout values."
   (declare #.`(ignorable ,@*layout-set-keys*))
-  (unless *allow-widget-access*
+  (unless *widget*
     (error "You can use layout-set function only inside defwidget."))
-  `(layout-set% ,*widget-symbol* ,@keyword-args))
+  (apply #'layout-set% *widget* keyword-args))
 
-(defmacro widget-rebuild ()
-  (unless *allow-widget-access*
+(defun widget-rebuild ()
+  (unless *widget*
     (error "widget-rebuild can only be called from inside defwidget."))
-  `(setf (widget-dirty ,*widget-symbol*) t))
+  (setf (widget-dirty *widget*) t))
 
-(defmacro widget-bounds ()
+(defun widget-bounds ()
   "Returns (values x y w h)"
-  (unless *allow-widget-access*
+  (unless *widget*
     (error "widget-bounds can only be called from inside defwidget."))
-  `(let ((lx (widget-layout-x ,*widget-symbol*))
-	 (ly (widget-layout-y ,*widget-symbol*)))
-     (values (layout-offset lx) (layout-offset ly) (layout-size lx) (layout-size ly))))
+  (let ((lx (widget-layout-x *widget*))
+	(ly (widget-layout-y *widget*)))
+    (values (layout-offset lx) (layout-offset ly) (layout-size lx) (layout-size ly))))
 
-(defmacro on (event-class-symbol handler)
-  (unless (and *allow-widget-access* *allow-context-access*)
+(defun on (event-class-symbol handler)
+  (unless (and *widget* *context*)
     (error "on can only be called from inside defwidget in :build."))
-  `(vector-push-extend (cons (find-class ,event-class-symbol)  ,handler) (widget-event-handlers ,*widget-symbol*)))
+  (vector-push-extend (cons (find-class event-class-symbol) handler) (widget-event-handlers *widget*)))
 
 (defun destructure-defwidget-args (args)
   (let (state build on-layout-x on-layout-y render)
@@ -143,15 +139,21 @@
 		  (setf render (rest clause))))))))
     (values state build on-layout-x on-layout-y render)))
 
-(defun defwidget-create-lambda (widget-var args-and-body)
+(defun defwidget-create-lambda (args-and-body)
   (destructuring-bind (args . body) args-and-body
     (let* ((decals (if (and (listp body) (listp (first body)) (eql (first (first body)) 'declare))
 		       (first body)))
 	   (body (if decals (rest body) body)))
-      `(lambda (,widget-var ,@args)
-	 (declare (ignorable ,widget-var))
+      `(lambda (*widget* ,@args)
 	 ,decals
-	 ,(trivial-macroexpand-all:macroexpand-all `(progn ,@body))))))
+	 ,@body))))
+
+(defmacro callback ((&rest args) &body body)
+  (let ((widget (gensym "widget")))
+    `(let ((,widget *widget*))
+       (lambda (,@args)
+	 (let ((*widget* ,widget))
+	   ,@body)))))
 
 (defmacro defwidget (name (&rest lambda-list)
 		     &body args)
@@ -163,10 +165,7 @@
 	(destructure-defwidget-args args)
       (let* ((decals (if (and (listp build) (listp (first build)) (eql (first (first build)) 'declare))
 			 (first build)))
-	     (build (if decals (rest build) build))
-	     (*allow-widget-access* t)
-	     (*widget-symbol* widget)
-	     (*context-symbol* context))
+	     (build (if decals (rest build) build)))
 	`(defun ,name (,@lambda-list)
 	   ,decals
 	   (lambda (,widget ,context &aux (use-old (and ,widget (eql (widget-version ,widget) ,version))))
@@ -188,25 +187,19 @@
 					    (widget-children ,widget)
 					    (make-array 0 :fill-pointer 0 :adjustable t))
 			      :build-function
-			      ,(let ((*allow-context-access* t))
-				 `(lambda (,widget ,context)
-				    (declare (ignorable ,widget ,context))
-				    ;; Set build function
-				    (setf (fill-pointer (widget-properties ,widget)) 0)
-				    (setf (fill-pointer (widget-event-handlers ,widget)) 0)
-				    ,(trivial-macroexpand-all:macroexpand-all
-				      `(progn ,@build))))
+			      (lambda (*widget* *context*)
+				,@build)
 			      :on-layout-x-function
 			      ,(when on-layout-x
-				 (defwidget-create-lambda widget on-layout-x))
+				 (defwidget-create-lambda on-layout-x))
 
 			      :on-layout-y-function
 			      ,(when on-layout-y
-				 (defwidget-create-lambda widget on-layout-y))
+				 (defwidget-create-lambda on-layout-y))
 
 			      :render-function
 			      ,(when render
-				 (defwidget-create-lambda widget render))))
+				 (defwidget-create-lambda render))))
 	       ;; Initialize variables
 	       (unless use-old
 		 ,@(loop for binding in state
@@ -216,29 +209,27 @@
 	     ;; Return widget (the same or the newly created one)
 	     ,widget))))))
 
-(defmacro wrap-after (widget-form &body after-body-forms)
-  (let ((widget (gensym "widget-me"))
-	(widget-wrapped (gensym "widget-wrapped"))
+
+(defmacro wrap-build (widget-form &body build)
+  "Create a widget that overrides the build of the `widget'.
+Use `call-original-build' inside the `build' forms to call the original build function."
+  (let ((widget (gensym "widget"))
 	(context (gensym "context"))
-	(build-func (gensym "build-func")))
-    (let ((*widget-symbol* widget)
-	  (*context-symbol* context)
-	  (*allow-widget-access* t)
-	  (*allow-context-access* t))
-      `(let ((,widget-wrapped ,widget-form))
-	 (lambda (,widget ,context)
-	   (let* ((,widget (funcall ,widget-wrapped ,widget ,context))
-		  (,build-func (widget-build-function ,widget)))
-	     (setf (widget-build-function ,widget)
-		   (lambda (,widget ,context)
-		     (prog1 (funcall ,build-func ,widget ,context)
-		       ,(trivial-macroexpand-all:macroexpand-all
-			 `(progn ,@after-body-forms)))))
-	     ,widget))))))
+	(original-build (gensym "original-build")))
+    `(lambda (,widget ,context)
+       (setf ,widget (funcall ,widget-form ,widget ,context))
+       (let ((,original-build (widget-build-function ,widget)))
+	 (setf (widget-build-function ,widget)
+	       (lambda (*widget* *context*)
+		 (macrolet ((call-original-build ()
+			      `(funcall ,',original-build *widget* *context*)))
+		   ,@build))))
+       ,widget)))
 
 (defmacro layout (#.`(&rest keyword-args &key ,@*layout-set-keys*) &body widget-form)
   (declare #.`(ignorable ,@*layout-set-keys*))
-  `(wrap-after (progn ,@widget-form)
+  `(wrap-build (progn ,@widget-form)
+     (call-original-build)
      (layout-set ,@keyword-args)))
 
 (defun recompiledp (widget)
@@ -254,21 +245,26 @@
 		  (setf (widget-dirty widget) nil)
 		  (let* ((child-widgets (widget-children widget))
 			 (old-length (length child-widgets))
-			 (child-widgets-func (uiop:ensure-list (funcall (widget-build-function widget) widget context))))
+			 (child-widget-funcs))
+
+		    ;; Stuff to do before calling widget-build-function
+		    (setf (fill-pointer (widget-properties widget)) 0)
+		    (setf (fill-pointer (widget-event-handlers widget)) 0)
+		    ;; Build the widget
+		    (setf child-widget-funcs (uiop:ensure-list (funcall (widget-build-function widget) widget context)))
 
 		    (context-setup context widget)
-
 		    ;; Update widget-children
 		    (setf (fill-pointer child-widgets) 0)
 		    (loop for i from 0
-			  for child-widget-func in child-widgets-func
+			  for child-widget-func in child-widget-funcs
 			  for child-old-widget = (when (< i old-length) (aref child-widgets i))
 			  do
 			     (let ((child-widget (funcall child-widget-func child-old-widget context)))
 			       (update-widget-tree child-widget context)
 			       (vector-push-extend child-widget child-widgets)))
-
 		    (context-restore context widget))
+
 		  (setf errored nil))
 	     (when errored
 	       (setf (widget-dirty widget) t)))))

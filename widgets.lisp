@@ -45,7 +45,7 @@
   (:state pressed)
   (:build
    (on 'sdl3:mouse-button-event
-       (lambda (event)
+       (callback (event)
 	 (let ((old pressed))
 	   (if (sdl3:%down event)
 	       (multiple-value-bind (x y w h) (widget-bounds)
@@ -90,7 +90,7 @@
 		 (progn (setf refresh-time (get-internal-real-time))
 			(widget-rebuild))
 		 (sb-ext:schedule-timer (sb-ext:make-timer
-					 (lambda ()
+					 (callback ()
 					   (setf refresh-time (get-internal-real-time))
 					   (widget-rebuild)))
 					delta)))))
