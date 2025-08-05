@@ -112,18 +112,30 @@
    (text (format nil "~,3f" (seconds-elapsed mount-time))))
   (:render (r x y w h)
 	   (declare (ignore r x y w h))
-	   (widget-rebuild )))
+	   (widget-rebuild)))
 
-(defwidget row (layout-args &rest widgets)
+(defwidget row-widget (layout-args widgets-func)
   (:build
    (apply #'layout-set layout-args)
-   widgets))
+   (funcall widgets-func)))
 
-(defwidget column (layout-args &rest widgets)
+(defmacro row ((&rest layout-args) &body widgets)
+  `(row-widget (list ,@layout-args)
+	       (lambda ()
+		 (list
+		  ,@widgets))))
+
+(defwidget column-widget (layout-args widgets-func)
   (:build
    (apply #'layout-set layout-args)
    (layout-set :major-axis :y)
-   widgets))
+   (funcall widgets-func)))
+
+(defmacro column ((&rest layout-args) &body widgets)
+  `(column-widget (list ,@layout-args)
+	       (lambda ()
+		 (list
+		  ,@widgets))))
 
 (defwidget home-screen ()
   (:build
@@ -131,8 +143,8 @@
 	       :flex.y 1.0
 	       :alignment.x :center
 	       :alignment.y :center)
-   (list (row '(:flex.x 1.0))
-	 (column '(:flex.x 1.0)
+   (list (row (:flex.x 1.0))
+	 (column (:flex.x 1.0)
 		 (layout (:width.min 150.0
 			  :padding.x 5.0
 			  :padding.y 20.0)
@@ -141,7 +153,7 @@
 			  :padding.x 5.0
 			  :padding.y 20.0)
 		   (button "Stop!!" (lambda () (print "Stop clicked!")))))
-	 (row '(:alignment.x :end
+	 (row (:alignment.x :end
 		:width.min 100.0
 		:flex.x 1.0)
 	      (countdown)))))
