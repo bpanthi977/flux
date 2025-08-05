@@ -127,7 +127,7 @@
 	     (build (if decals (rest build) build)))
 	`(defun ,name (,@lambda-list)
 	   ,decals
-	   (lambda (,widget ,context)
+	   (lambda (,widget ,context &aux (use-old (and ,widget (eql (widget-version ,widget) ,version))))
 	     (declare (ignorable ,context))
 	     ;; TODO: Create widget if necessary
 	     ;; only when :memo says so
@@ -141,7 +141,12 @@
 				:name ',name
 				:version ,version
 				:dirty t
-				:state (make-array ,(length state) :initial-element nil)
+				:state (if use-old
+					   (widget-state ,widget)
+					   (make-array ,(length state) :initial-element nil))
+				:children (if ,widget
+					      (widget-children ,widget)
+					      (make-array 0 :fill-pointer 0 :adjustable t))
 				:build-function
 				(lambda (,widget ,context)
 				  (declare (ignorable ,widget ,context))
@@ -174,10 +179,11 @@
 				      (declare (ignorable ,widget))
 				      ,@(rest render)))))
 		 ;; Initialize variables
-		 ,@(loop for binding in state
-			 for i from 0
-			 when (listp binding)
-			   collect `(setf ,(first binding) ,(second binding)))))
+		 (unless use-old
+		   ,@(loop for binding in state
+			   for i from 0
+			   when (listp binding)
+			     collect `(setf ,(first binding) ,(second binding))))))
 	     ;; Return widget (the same or the newly created one)
 	     ,widget))))))
 
