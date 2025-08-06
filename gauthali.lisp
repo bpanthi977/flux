@@ -59,7 +59,7 @@
 	  (context-set-property% context :text-engine text-engine)
 	  (context-set-property% context :bg-color #(255 255 255 255))
 	  (context-set-property% context :fg-color #(0 0 0 255))
-
+	  (sdl3:start-text-input window)
 	  ;; EVENT LOOP
 	  (unwind-protect
 	       (progn

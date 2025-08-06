@@ -1,5 +1,6 @@
 (in-package #:gauthali)
 
+
 (defwidget text (text)
   (:state (update t) _text font surface texture fg bg render-scale max-width min-height width height)
   (:build
@@ -58,48 +59,10 @@
 	     (when surface
 	       (setf texture (sdl3:create-texture-from-surface r surface))))
 	   (when texture
-	     (multiple-value-bind (ret sx sy) (sdl3:get-render-scale r)
-	       (assert-ret ret)
-	       (when (and (= sx sy) (not (= sx 1.0)))
-		 (sdl3:set-render-scale r 1.0 1.0))
-	       (sdl3:render-texture r texture nil (make-instance 'sdl3:frect :%x (* sx x) :%y (* sy y) :%w (* w sx) :%h (* h sy)))
-	       (when (and (= sx sy) (not (= sx 1.0)))
-		 (sdl3:set-render-scale r sx sy)))))
+	     (with-render-scale-off r (sx sy)
+	       (sdl3:render-texture r texture nil (make-instance 'sdl3:frect :%x (* sx x) :%y (* sy y) :%w (* w sx) :%h (* h sy))))))
   (:cleanup
    (when texture
      (sdl3:destroy-texture texture))
    (when surface
      (sdl3:destroy-surface surface))))
-
-#+nil(defwidget text-entry (initial-text on-change)
-  (:state (text initial-text) (focus t) border-color (cursor (length initial-text)))
-  (:build
-   (on 'sdl3:text-input-event
-       (callback (event)
-	 (when focus
-	   (setf text (concatenate 'string text (sdl3:%text event)))
-	   (funcall on-change text)
-	   (widget-rebuild))))
-
-   (on 'sdl3:keyboard-event
-       (callback (event)
-	 (when (and focus
-		    (eql (sdl3:%key event) :backspace)
-		    (> (length text) 0))
-	   (setf text (subseq text 0 (max 0 (1- (length text)))))
-	   (funcall on-change text)
-	   (widget-rebuild))))
-
-   (layout-set :flex.x :least :flex.y :least
-	       :alignment.y :center :alignment.x :start
-	       :padding.x 1.0
-	       :padding.y 1.0)
-   (setf border-color (or (property-get :border-color)
-			  (property-get :border-color)
-			  #(0 0 0 255)))
-   (text text))
-  (:render (r x y w h)
-	   (set-render-draw-color r border-color)
-	   (sdl3:render-rect r (make-instance 'sdl3:frect :%h h :%w w :%y y :%x x))
-	   (when focus
-	     (sdl3:render-line r (+ x w )))))

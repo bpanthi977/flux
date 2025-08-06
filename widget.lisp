@@ -149,7 +149,8 @@
 	   (body (if decals (rest body) body)))
       `(lambda (*widget* ,@args)
 	 ,decals
-	 ,@body))))
+	 (block nil
+	   ,@body)))))
 
 (defmacro callback ((&rest args) &body body)
   (let ((widget (gensym "widget")))
@@ -195,7 +196,8 @@
 					    (make-array 0 :fill-pointer 0 :adjustable t))
 			      :build-function
 			      (lambda (*widget* *context*)
-				,@build)
+				(block nil
+				  ,@build))
 			      :on-layout-x-function
 			      ,(when on-layout-x
 				 (defwidget-create-lambda on-layout-x))
