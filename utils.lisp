@@ -14,6 +14,12 @@
 		 :%b (aref color 2)
 		 :%a (aref color 3)))
 
+(defun sdl3-rect (x y w h)
+  (make-instance 'sdl3:rect :%x x :%y y :%w w :%h h))
+
+(defun sdl3-frect (x y w h)
+  (make-instance 'sdl3:frect :%x x :%y y :%w w :%h h))
+
 (defun set-render-draw-color (r color)
   (sdl3:set-render-draw-color r (aref color 0) (aref color 1) (aref color 2) (aref color 3)))
 
