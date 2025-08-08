@@ -2,6 +2,21 @@
 (in-package #:gauthali)
 
 (defparameter *uis* nil)
+(defparameter *window-positions* (make-hash-table))
+
+(defun update-window-position (event-type window-widget &optional data1 data2)
+  (flet ((set-val (key val)
+	   (let ((entry (gethash window-widget *window-positions* )))
+	     (unless entry
+	       (setf entry (list :xy nil :size nil))
+	       (setf (gethash window-widget *window-positions*) entry))
+	     (setf (getf entry key) val))))
+    (case event-type
+      (:window-moved
+       (set-val :xy (cons data1 data2)))
+      (:window-resized
+       (set-val :size (cons data1 data2))))))
+
 (defstruct UI
   (window)
   (window-id)
@@ -12,8 +27,15 @@
 
 (defun init-ui (window renderer root-widget-symbol)
   (let ((font (sdl3-ttf:open-font (namestring (get-resource-path "res/fonts/Times New Roman.ttf")) 24.0))
-	(context (make-context)))
+	(context (make-context))
+	(entry (gethash root-widget-symbol *window-positions*)))
     (assert-ret (not (cffi:null-pointer-p font)))
+    (when entry
+      (when (getf entry :size)
+	(sdl3:set-window-size window (car (getf entry :size)) (cdr (getf entry :size))))
+      (when (getf entry :xy)
+	(sdl3:set-window-position window (car (getf entry :xy)) (cdr (getf entry :xy)))))
+
     (context-set-property% context :font font)
     (context-set-property% context :font-size 24.0)
     (context-set-property% context :render-scale 1.0)
@@ -25,7 +47,7 @@
      :renderer renderer
      :widget-symbol root-widget-symbol
      :widget nil
-     :context (init-ui-context))))
+     :context context)))
 
 (defun handle-event (event uis)
   (let* ((window-id (if (slot-exists-p event 'sdl3:%window-id)
@@ -54,7 +76,7 @@
 
       (case (sdl3:%type event)
 	(:window-display-scale-changed
-	 (let* ((window-id (sdl3:%window event))
+	 (let* ((window-id (sdl3:%window-id event))
 		(display-scale (sdl3:get-window-display-scale (sdl3:get-window-from-id window-id)))
 		(ui (find window-id uis :key #'ui-window-id))
 		(context (when ui (ui-context ui))))
@@ -64,7 +86,12 @@
 	     (sdl3-ttf:set-font-size (context-get-property% context :font)
 				     (* (context-get-property% context :font-size) display-scale))
 	     ;; Mark all widgets as dirty
-	     (widget-rebuild-all (ui-widget ui)))))))))
+	     (widget-rebuild-all (ui-widget ui)))))
+	((:window-moved :window-resized)
+	 (let* ((window-id (sdl3:%window-id event))
+		(ui (find window-id uis :key #'ui-window-id)))
+	   (when ui
+	     (update-window-position (sdl3:%type event) (ui-widget-symbol ui) (sdl3:%data-1 event) (sdl3:%data-2 event)))))))))
 
 (defun update-ui (ui)
   (with-slots (window renderer (root-widget widget) (root-widget-symbol widget-symbol) context) ui
@@ -85,7 +112,7 @@
   (assert-ret (sdl3:init '(:video)))
   (let ((mouse-x nil)
 	(mouse-y nil)
-	(uis (make-array 0 :element-type 'window :adjustable t :fill-pointer 0)))
+	(uis (make-array 0 :element-type 'ui :adjustable t :fill-pointer 0)))
     (setf *uis* uis)
 
     (sdl3-ttf:init)
@@ -124,7 +151,7 @@
       (sdl3:pump-events)
       ;; And since we pumped, we flush so that it doesn't affect next
       ;; time we create window
-      (sdl3:flush-events 0 (cffi:foreign-enum-value 'sdl3:event-type :last))))))))
+      (sdl3:flush-events 0 (cffi:foreign-enum-value 'sdl3:event-type :last)))))
 
 (defun main ()
   (trivial-main-thread:with-body-in-main-thread (:blocking t)
