@@ -49,9 +49,11 @@
 		    (when surface
 		      (sdl3:destroy-surface surface)
 		      (setf surface nil))
-		    (setf surface (sdl3-ttf:render-text-lcd-wrapped font _text 0 (sdl3-color fg) (sdl3-color bg) (floor (* render-scale width))))))
+		    (setf surface (sdl3-ttf:render-text-lcd-wrapped font _text 0 (sdl3-color fg) (sdl3-color bg) (floor (* render-scale width)))
+			  update t)))
 
 		(layout-set :height.min height))
+
   (:render (r x y w h)
 	   (when update
 	     (setf update nil)
