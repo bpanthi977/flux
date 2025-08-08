@@ -45,21 +45,26 @@
 	 (case (sdl3:%key event)
 	   (:q (cffi:with-foreign-object (ev '(:struct sdl3:quit-event))
 		 (setf (cffi:foreign-slot-value ev '(:struct sdl3:quit-event) 'sdl3:%type) :quit)
-		 (sdl3:push-event ev))))))
+		 (sdl3:push-event ev)))
+	   (:d (when (and (member :lctrl (sdl3:%mod event))
+			  (not (find 'debugger uis :key #'ui-widget-symbol)))
+		 (multiple-value-bind (ret w r) (sdl3:create-window-and-renderer "Debugger" 200 400 '(:resizable :high-pixel-density))
+		   (assert-ret ret)
+		   (vector-push-extend (init-ui w r 'debugger) uis)))))))
 
       (case (sdl3:%type event)
 	(:window-display-scale-changed
 	 (let* ((window-id (sdl3:%window event))
 		(display-scale (sdl3:get-window-display-scale (sdl3:get-window-from-id window-id)))
 		(ui (find window-id uis :key #'ui-window-id))
-		(context (ui-context ui)))
-
-	   (context-set-property% context :render-scale display-scale)
-	   (sdl3:set-render-scale (ui-renderer ui) display-scale display-scale)
-	   (sdl3-ttf:set-font-size (context-get-property% context :font)
-				   (* (context-get-property% context :font-size) display-scale))
-	   ;; Mark all widgets as dirty
-	   (widget-rebuild-all (ui-widget ui))))))))
+		(context (when ui (ui-context ui))))
+	   (when ui
+	     (context-set-property% context :render-scale display-scale)
+	     (sdl3:set-render-scale (ui-renderer ui) display-scale display-scale)
+	     (sdl3-ttf:set-font-size (context-get-property% context :font)
+				     (* (context-get-property% context :font-size) display-scale))
+	     ;; Mark all widgets as dirty
+	     (widget-rebuild-all (ui-widget ui)))))))))
 
 (defun update-ui (ui)
   (with-slots (window renderer (root-widget widget) (root-widget-symbol widget-symbol) context) ui
