@@ -15,6 +15,7 @@
 			:serial t
 			:components ((:file "core")
 				     (:file "text")
-				     (:file "button")))
+				     (:file "button")
+				     (:file "text-entry")))
 	       (:file "screens")
                (:file "gauthali")))
