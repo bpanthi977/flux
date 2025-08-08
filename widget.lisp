@@ -108,7 +108,8 @@
 (defun on (event-class-symbol handler)
   (unless (and *widget* *context*)
     (error "on can only be called from inside defwidget in :build."))
-  (vector-push-extend (cons (find-class event-class-symbol) handler) (widget-event-handlers *widget*)))
+  (vector-push-extend (cons (find-class event-class-symbol) handler) (widget-event-handlers *widget*))
+  nil)
 
 (defun destructure-defwidget-args (args)
   (let (state build on-layout-x on-layout-y render cleanup)

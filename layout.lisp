@@ -56,7 +56,7 @@ size = max size(children) [If dimension is minor aixs]"
 		      (total-padding-and-gap (+ (* 2 (layout-padding el))
 						(or
 						 (and (layout-major-axisp el)
-						      (* (1- (length children))
+						      (* (max 0 (1- (length children)))
 							 (layout-child-gap el)))
 						 0.0)))
 		      (fit-size (clamp-size el (coerce (min most-positive-short-float
