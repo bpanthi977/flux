@@ -450,6 +450,8 @@ The layout of root-widget is set as per `x', `y', `w' and `h'."
 	     (root-widget-initializer (funcall root-widget-def)))
 	(setf root-widget (create-widget root-widget-initializer root-widget context))))
 
+    ;; Update widget tree
+    (update-widget-tree root-widget context)
 
     ;; Set the layout of root widget
     (setf (layout-type (widget-layout-x root-widget)) :fixed)
@@ -461,8 +463,6 @@ The layout of root-widget is set as per `x', `y', `w' and `h'."
     (setf (layout-offset (widget-layout-x root-widget)) (coerce x 'single-float))
     (setf (layout-offset (widget-layout-y root-widget)) (coerce y 'single-float))
 
-    ;; Update widget tree
-    (update-widget-tree root-widget context)
     ;; Compute layout of widget tree
     (update-widget-layouts root-widget)
     ;; Render
