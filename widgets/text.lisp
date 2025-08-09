@@ -32,6 +32,7 @@
 		    height min-height)))))
 
    (layout-set :flex.x 1.0
+	       :width.min (property-get :font-size)
 	       :width.max max-width
 	       :height.min min-height)
    nil)
@@ -62,7 +63,7 @@
 	       (setf texture (sdl3:create-texture-from-surface r surface))))
 	   (when texture
 	     (with-render-scale-off r (sx sy)
-	       (sdl3:render-texture r texture nil (make-instance 'sdl3:frect :%x (* sx x) :%y (* sy y) :%w (* w sx) :%h (* h sy))))))
+	       (sdl3:render-texture r texture nil (make-instance 'sdl3:frect :%x (* sx x) :%y (* sy y) :%w (* (min w max-width) sx) :%h (* h sy))))))
   (:cleanup
    (when texture
      (sdl3:destroy-texture texture))
