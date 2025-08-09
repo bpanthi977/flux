@@ -30,7 +30,7 @@
 
 (defun get-layout-constructor (w axis)
   (labels ((create-tree (widget accessor)
-	   (cons (layout-without-defaults (funcall accessor widget))
+	   (cons (cons (widget-name widget) (layout-without-defaults (funcall accessor widget)))
 		 (loop for child across (widget-children widget)
 		       collect (create-tree child accessor)))))
     (ecase axis
