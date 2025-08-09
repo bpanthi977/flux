@@ -25,18 +25,17 @@
 
 (defun clamp-size (el size)
   (min (layout-maximum el)
-       (max (layout-minimum el) size)))
+       (max (layout-minimum el) (coerce size 'single-float))))
 
 (defun remaining-size (el children)
   "Space remaining in element `el' after allocating space for
 `children', padding and gap between children."
   (- (layout-size el)
-     (+ (loop for child in children
-	      summing (layout-size (car child)))
-	(* 2 (layout-padding el))
-	(if children
-	    (* (layout-child-gap el) (1- (length children)))
-	    0))))
+     (max 0.0
+	  (+ (loop for child in children
+		   summing (layout-size (car child)))
+	     (* 2 (layout-padding el))
+	     (* (layout-child-gap el) (max 0 (1- (length children))))))))
 
 (defun compute-fit-size (el children)
   "If element layout type is FIT
@@ -59,9 +58,7 @@ size = max size(children) [If dimension is minor aixs]"
 						      (* (max 0 (1- (length children)))
 							 (layout-child-gap el)))
 						 0.0)))
-		      (fit-size (clamp-size el (coerce (min most-positive-short-float
-							    (+ children-size total-padding-and-gap))
-						       'short-float))))
+		      (fit-size (clamp-size el (+ children-size total-padding-and-gap))))
 		 (case (layout-type el)
 		   (:fit (setf (layout-size el) fit-size))
 		   (:flex (setf (layout-minimum el) fit-size)
@@ -98,7 +95,6 @@ size = max size(children) [If dimension is minor aixs]"
 	   (remove-el (ref-cons value)
 	     "Set the size to `value' and remove from flex elements."
 	     (setf (layout-size (car ref-cons)) value)
-	     (decf remaining value)
 	     (setf (car ref-cons) nil))
 
 	   (proportionate-size (el flex-sum remaining)
@@ -108,7 +104,6 @@ size = max size(children) [If dimension is minor aixs]"
 		       (layout-flex-value el))
 		   flex-sum)
 		remaining)))
-
       (when flex-els
 	;; Unless remaning size is below threshold
 	;; distribute the remaining size to flex elements
@@ -126,14 +121,15 @@ size = max size(children) [If dimension is minor aixs]"
 		     do
 			(setf no-updates nil)
 			(let* ((increment (proportionate-size el flex-sum prev-remaining))
+			       (old-size (layout-size el))
 			       (new-size (+ (layout-size el) increment)))
 			  (cond ((> (layout-minimum el) new-size)
 				 (remove-el ref-cons (layout-minimum el)))
 				((< (layout-maximum el) new-size)
 				 (remove-el ref-cons (layout-maximum el)))
 				(t
-				 (setf (layout-size el) new-size)
-				 (decf remaining increment))))))))))
+				 (setf (layout-size el) new-size)))
+			  (decf remaining (- (layout-size el) old-size)))))))))
 
 (defun compute-flex-size (el children)
   (if (layout-major-axisp el)
