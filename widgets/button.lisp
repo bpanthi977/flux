@@ -3,11 +3,11 @@
 (defwidget button (name on-press)
   (:state pressed)
   (:build
-   (on 'sdl3:mouse-button-event
-       (callback (event)
+   (on sdl3:mouse-button-event
+       (lambda (event)
 	 (let ((old pressed))
 	   (if (sdl3:%down event)
-	       (multiple-value-bind (x y w h) (widget-bounds)
+	       (multiple-value-bind (x y w h) (widget-bounds this)
 		 (if (and (<= x (sdl3:%x event) (+ x w))
 			  (<= y (sdl3:%y event) (+ y h)))
 		     (setf pressed t)
@@ -16,9 +16,10 @@
 	   (unless (eql old pressed)
 	     (when pressed
 	       (funcall on-press))
-	     (widget-rebuild)))))
+	     (widget-rebuild this)))))
 
-   (layout-set :alignment.x :center
+   (layout-set this
+	       :alignment.x :center
 	       :alignment.y :center)
    (text name))
   (:render (r x y w h)

@@ -31,7 +31,8 @@
 	      (setf min-height (/ (coerce h 'single-float) render-scale)
 		    height min-height)))))
 
-   (layout-set :flex.x 1.0
+   (layout-set this
+	       :flex.x 1.0
 	       :width.min (property-get :font-size)
 	       :width.max max-width
 	       :height.min min-height)
@@ -53,7 +54,7 @@
 		    (setf surface (sdl3-ttf:render-text-lcd-wrapped font _text 0 (sdl3-color fg) (sdl3-color bg) (floor (* render-scale width)))
 			  update t)))
 
-		(layout-set :height.min height))
+		(layout-set this :height.min height))
 
   (:render (r x y w h)
 	   (when update

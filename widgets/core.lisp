@@ -2,12 +2,13 @@
 
 (defwidget spacer ()
   (:build
-   (layout-set :flex.x 1.0
+   (layout-set this
+	       :flex.x 1.0
 	       :flex.y 1.0)))
 
 (defwidget row-widget (layout-args widgets-func)
   (:build
-   (apply #'layout-set layout-args)
+   (apply #'layout-set this layout-args)
    (funcall widgets-func)))
 
 (defmacro row ((&rest layout-args) &body widgets)
@@ -18,8 +19,8 @@
 
 (defwidget column-widget (layout-args widgets-func)
   (:build
-   (apply #'layout-set layout-args)
-   (layout-set :major-axis :y)
+   (apply #'layout-set this layout-args)
+   (layout-set this :major-axis :y)
    (funcall widgets-func)))
 
 (defmacro column ((&rest layout-args) &body widgets)

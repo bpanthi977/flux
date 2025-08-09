@@ -1,71 +1,5 @@
 (in-package #:gauthali)
 
-#+nil(defun clamp (value min max)
-  (max min (min value max)))
-
-;; Text segment widget for rendering a portion of text
-#+nil(defwidget text-segment (text start end)
-  (:state font surface texture fg bg render-scale update segment-text)
-  (:build
-   ;; Get properties
-   (setf font (property-get :font))
-   (setf fg (property-get :fg-color))
-   (setf bg (property-get :bg-color))
-   (setf render-scale (property-get :render-scale))
-
-   ;; Extract the text segment
-   (let* ((text-len (if text (length text) 0))
-	  (safe-start (clamp start 0 text-len))
-	  (safe-end (clamp end safe-start text-len)))
-     (setf segment-text (if (and text (> text-len 0) (< safe-start safe-end))
-			    (subseq text safe-start safe-end)
-			    "")))
-
-   ;; Mark for update if text changed
-   (setf update t)
-
-   ;; No layout constraints - parent will handle sizing
-   nil)
-
-  (:render (r x y w h)
-    (declare (ignorable w h))
-    ;; Update texture if needed
-    (when update
-      (setf update nil)
-
-      ;; Clean up old resources
-      (when texture
-	(sdl3:destroy-texture texture)
-	(setf texture nil))
-      (when surface
-	(sdl3:destroy-surface surface)
-	(setf surface nil))
-
-      ;; Create new surface and texture if we have text
-      (when (and segment-text (> (length segment-text) 0) font fg)
-	(setf surface (sdl3-ttf:render-text-lcd font segment-text 0 (sdl3-color fg) (sdl3-color bg)))
-	(when surface
-	  (setf texture (sdl3:create-texture-from-surface r surface)))))
-
-    ;; Render the texture
-    (when texture
-      (multiple-value-bind (ret sx sy) (sdl3:get-render-scale r)
-	(assert-ret ret)
-	(when (and (= sx sy) (not (= sx 1.0)))
-	  (sdl3:set-render-scale r 1.0 1.0))
-	(multiple-value-bind (ret w h) (sdl3:get-texture-size texture)
-	  (assert-ret ret)
-	  (sdl3:render-texture r texture nil (make-instance 'sdl3:frect :%x (* sx x) :%y (* sy y) :%w w :%h h)))
-
-	(when (and (= sx sy) (not (= sx 1.0)))
-	  (sdl3:set-render-scale r sx sy)))))
-
-  (:cleanup
-    (when texture
-      (sdl3:destroy-texture texture))
-    (when surface
-      (sdl3:destroy-surface surface))))
-
 (defclass text-texture-cache ()
   ((text :initarg :text)
    (texture :initform nil)
@@ -118,7 +52,7 @@
 	  (cursor-last-shown 0))
   (:build
    ;; Handle text input events
-   (on 'sdl3:text-input-event
+   (on sdl3:text-input-event
        (callback (event)
 	 (when focus
 	   (let* ((input-text (sdl3:%text event))
@@ -127,10 +61,10 @@
 	     (setf text (concatenate 'string before input-text after))
 	     (incf cursor-pos (length input-text))
 	     (when on-change (funcall on-change text))
-	     (widget-rebuild)))))
+	     (widget-rebuild this)))))
 
    ;; Handle keyboard events
-   (on 'sdl3:keyboard-event
+   (on sdl3:keyboard-event
        (callback (event)
 	 (when (and focus (sdl3:%down event))
 	   (case (sdl3:%key event)
@@ -142,7 +76,7 @@
 		  (setf text (concatenate 'string before after))
 		  (decf cursor-pos)
 		  (when on-change (funcall on-change text))
-		  (widget-rebuild))))
+		  (widget-rebuild this))))
 
 	     ;; Delete - delete character after cursor
 	     (:delete
@@ -151,29 +85,29 @@
 		       (after (subseq text (1+ cursor-pos))))
 		  (setf text (concatenate 'string before after))
 		  (when on-change (funcall on-change text))
-		  (widget-rebuild))))
+		  (widget-rebuild this))))
 
 	     ;; Left arrow - move cursor left
 	     (:left
 	      (when (> cursor-pos 0)
 		(decf cursor-pos)
-		(widget-rebuild)))
+		(widget-rebuild this)))
 
 	     ;; Right arrow - move cursor right
 	     (:right
 	      (when (< cursor-pos (length text))
 		(incf cursor-pos)
-		(widget-rebuild)))
+		(widget-rebuild this)))
 
 	     ;; Home - move cursor to beginning
 	     (:home
 	      (setf cursor-pos 0)
-	      (widget-rebuild))
+	      (widget-rebuild this))
 
 	     ;; End - move cursor to end
 	     (:end
 	      (setf cursor-pos (length text))
-	      (widget-rebuild))))))
+	      (widget-rebuild this))))))
 
    ;; Get properties
    (let ((font (property-get :font)))
@@ -191,10 +125,11 @@
 
      (with-slots (surface) texture-cache
        (if surface
-	   (layout-set :width.max (float (/ (cffi:foreign-slot-value surface '(:struct sdl3:surface) 'sdl3:%w) render-scale))
+	   (layout-set this
+		       :width.max (float (/ (cffi:foreign-slot-value surface '(:struct sdl3:surface) 'sdl3:%w) render-scale))
 		       :height.min (float (/ (cffi:foreign-slot-value surface '(:struct sdl3:surface) 'sdl3:%h) render-scale)))))
 
-     (layout-set :flex.x 1.0)))
+     (layout-set this :flex.x 1.0)))
 
   (:render (r x y w h)
     ;; Compute start-x, end-x: the clipping range of texture we can
@@ -251,19 +186,20 @@
   (:state focus fg)
   (:build
 
-   (on 'sdl3:mouse-button-event
+   (on sdl3:mouse-button-event
        (callback (event)
 	 (let ((prev-focus focus))
 	   (when (sdl3:%down event)
-	     (multiple-value-bind (x y w h) (widget-bounds)
+	     (multiple-value-bind (x y w h) (widget-bounds this)
 	       (if (and (<= x (sdl3:%x event) (+ x w))
 			(<= y (sdl3:%y event) (+ y h)))
 		   (setf focus t)
 		   (setf focus nil))))
 	   (unless (eql focus prev-focus)
-	     (widget-rebuild)))))
+	     (widget-rebuild this)))))
    (setf fg (property-get :fg-color))
-   (layout-set :alignment.y :center
+   (layout-set this
+	       :alignment.y :center
 	       :padding padding)
    (text-entry0 text on-change focus cursor-blink-rate))
   (:render (r x y w h)

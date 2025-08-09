@@ -10,12 +10,12 @@
    (text (format nil "~,3f" (seconds-elapsed mount-time))))
   (:render (r x y w h)
    (declare (ignore r x y w h))
-   (widget-rebuild)))
+   (widget-rebuild this)))
 
 (defwidget home-screen ()
   (:state (text "hello world"))
   (:build
-   (layout-set :flex.x 1.0
+   (layout-set this :flex.x 1.0
 	       :flex.y 1.0
 	       :alignment.x :center
 	       :alignment.y :center)
@@ -25,7 +25,7 @@
 		    :height.min 40.0)
 	     (text-entry text (lambda (txt)
 				(setf text txt)
-				(widget-rebuild)))))
+				(widget-rebuild this)))))
 	 (column (:flex.x 1.0)
 	   (layout (:width.min 150.0
 		    :padding.x 5.0

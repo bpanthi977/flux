@@ -15,7 +15,7 @@
           (knob-radius 10.0))
   (:build
    (flet ((update-value-from-event (event)
-            (multiple-value-bind (x y w h) (widget-bounds)
+            (multiple-value-bind (x y w h) (widget-bounds this)
               (declare (ignore y h))
               (let* ((track-width (- w (* 2 knob-radius)))
                      (mouse-x-on-track (clamp (sdl3:%x event)
@@ -27,15 +27,16 @@
                 (unless (= value new-value)
                   (setf value new-value)
                   (when on-change (funcall on-change value))
-                  (widget-rebuild))))))
+                  (widget-rebuild this))))))
 
-     (layout-set :flex.x 1.0
+     (layout-set this 
+		 :flex.x 1.0
 		 :flex.y 1.0
 		 :width.min (* 3 knob-radius)
                  :height.min (* 2 knob-radius))
-     (on 'sdl3:mouse-button-event
+     (on sdl3:mouse-button-event
          (callback (event)
-           (multiple-value-bind (x y w h) (widget-bounds)
+           (multiple-value-bind (x y w h) (widget-bounds this)
              (if (sdl3:%down event)
                  (when (and (<= x (sdl3:%x event) (+ x w))
                             (<= y (sdl3:%y event) (+ y h)))
@@ -43,8 +44,8 @@
                    (update-value-from-event event))
                  (when dragging
                    (setf dragging nil)
-                   (widget-rebuild))))))
-     (on 'sdl3:mouse-motion-event
+                   (widget-rebuild this))))))
+     (on sdl3:mouse-motion-event
          (callback (event)
            (when dragging
              (update-value-from-event event))))))
