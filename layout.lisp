@@ -6,26 +6,27 @@
   (minimum 0.0 :type single-float)
   (maximum most-positive-single-float :type single-float)
   (major-axisp t :type boolean)
-  (flex-value 0.0 :type (or single-float (member :least)))
+  (flex-value 0.0 :type single-float)
   (offset 0.0 :type single-float)
   (padding 0.0 :type single-float)
   (child-gap 0.0 :type single-float)
   (alignment :start :type (member :start :center :end))
-  (scratchpad (make-array 2 :element-type 'single-float) :type (simple-array single-float (2))))
+  (scratchpad (make-array 4 :element-type 'single-float) :type (simple-array single-float (4))))
 
 (defun traverse-dfs (fn root)
   (funcall fn (car root) (cdr root))
   (loop for el in (cdr root) do
-	(traverse-dfs fn el)))
+    (traverse-dfs fn el)))
 
 (defun traverse-reverse-dfs (fn root)
   (loop for el in (cdr root) do
-	(traverse-reverse-dfs fn el))
+    (traverse-reverse-dfs fn el))
   (funcall fn (car root) (cdr root)))
 
 (defun clamp-size (el size)
   (min (layout-maximum el)
-       (max (layout-minimum el) (coerce size 'single-float))))
+       (max (layout-minimum el) (coerce (min size most-positive-single-float)
+					'single-float))))
 
 (defun remaining-size (el children)
   "Space remaining in element `el' after allocating space for
@@ -42,7 +43,8 @@
 size = ∑   size(children) [If dimension is major axis]
 size = max size(children) [If dimension is minor aixs]"
   (unless (eql (layout-type el) :fixed)
-    (setf (layout-size el) 0.0)
+    (setf (layout-size el) (layout-minimum el))
+
     (labels ((accumulate (reduce-fn accessor)
 	       (loop for child in children
 		     for l = (car child)
@@ -50,27 +52,50 @@ size = max size(children) [If dimension is minor aixs]"
 		     do (setf acc (funcall reduce-fn acc (funcall accessor l)))
 		     finally (return acc)))
 
-	     (compute (reduce-fn)
-	       (let* ((children-size (accumulate reduce-fn (lambda (l) (max (layout-minimum l) (layout-size l)))))
-		      (total-padding-and-gap (+ (* 2 (layout-padding el))
-						(or
-						 (and (layout-major-axisp el)
-						      (* (max 0 (1- (length children)))
-							 (layout-child-gap el)))
-						 0.0)))
-		      (fit-size (clamp-size el (+ children-size total-padding-and-gap))))
-		 (case (layout-type el)
-		   (:fit (setf (layout-size el) fit-size))
-		   (:flex (setf (layout-minimum el) fit-size)
-		    (when (eql (layout-flex-value el) :least)
-		      (setf (layout-maximum el)
-			    (coerce (min most-positive-single-float
-					 (clamp-size el (+ (accumulate reduce-fn #'layout-maximum)
-							   total-padding-and-gap)))
-				    'single-float))))))))
+	     (has-flex-child ()
+	       (loop for child in children
+		     when (eql (layout-type (car child)) :flex)
+		       return t))
+
+	     (total-padding ()
+	       (+ (* 2 (layout-padding el))
+		  (if (layout-major-axisp el)
+		      (* (max 0 (1- (length children)))
+			 (layout-child-gap el))
+		      0.0)))
+
+	     (children-max (acc)
+	       (clamp-size el (+ (total-padding) (accumulate acc #'layout-maximum))))
+
+	     (children-total (acc)
+	       (clamp-size el (+ (total-padding) (accumulate acc #'layout-size)))))
+
       (if (layout-major-axisp el)
-	  (compute #'+)
-	  (compute #'max)))))
+	  ;; Major Axis
+	  (case (layout-type el)
+	    (:fit
+	     (if (not (has-flex-child))
+		 (setf (layout-size el) (children-total #'+))
+
+		 (setf (layout-type el) :flex
+		       (layout-flex-value el) 1.0
+		       (layout-maximum el) (children-max #'+)
+		       (layout-minimum el) (children-total #'+))))
+
+	     (:flex (setf (layout-minimum el) (children-total #'+))))
+
+	  ;; Minor Axis
+	  (case (layout-type el)
+	    (:fit
+	     (if (not (has-flex-child))
+		 (setf (layout-size el) (children-total #'max))
+
+		 (setf (layout-type el) :flex
+		       (layout-flex-value el) 1.0
+		       (layout-maximum el) (children-max #'max)
+		       (layout-minimum el) (children-total #'max))))
+	    (:flex (setf (layout-minimum el) (children-total #'max))))))))
+
 
 (defun compute-flex-size-major (el children)
   "If element children have FLEX layout, then FLEX them.
@@ -81,17 +106,14 @@ size = max size(children) [If dimension is minor aixs]"
 4. Iterate until all remaining size is distributed."
   (let* ((flex-els (loop for child in children
 			 when (and (eql (layout-type (car child)) :flex)
-				   (or (eql (layout-flex-value (car child)) :least)
-				       (not (= (layout-flex-value (car child)) 0.0))))
+				   (not (= (layout-flex-value (car child)) 0.0)))
 			   collect (car child)))
 	 (remaining (remaining-size el children)))
     (flet ((flex-sum ()
 	     "Sum of all flex values in flex elements."
 	     (loop for el in flex-els
 		   when el
-		     summing (if (eql (layout-flex-value el) :least)
-				 1.0
-				 (layout-flex-value el))))
+		     summing (layout-flex-value el)))
 	   (remove-el (ref-cons value)
 	     "Set the size to `value' and remove from flex elements."
 	     (setf (layout-size (car ref-cons)) value)
@@ -99,9 +121,7 @@ size = max size(children) [If dimension is minor aixs]"
 
 	   (proportionate-size (el flex-sum remaining)
 	     "New size increment that can be assigned to an `el' by using remaining size."
-	     (* (/ (if (eql (layout-flex-value el) :least)
-		       1.0
-		       (layout-flex-value el))
+	     (* (/ (layout-flex-value el)
 		   flex-sum)
 		remaining)))
       (when flex-els
@@ -158,28 +178,38 @@ size = max size(children) [If dimension is minor aixs]"
       (loop for child in children
 	    for child-size = (layout-size (car child))
 	    do
-	    (setf (layout-offset (car child))
-		  (+ (layout-offset el)
-		     (ecase (layout-alignment el)
-		       (:start (layout-padding el))
-		       (:end   (- (layout-size el) (layout-padding el) child-size))
-		       (:center (- (/ (layout-size el) 2)
-				   (/ child-size 2)))))))))
+	       (setf (layout-offset (car child))
+		     (+ (layout-offset el)
+			(ecase (layout-alignment el)
+			  (:start (layout-padding el))
+			  (:end   (- (layout-size el) (layout-padding el) child-size))
+			  (:center (- (/ (layout-size el) 2)
+				      (/ child-size 2)))))))))
 
-(defun save-min-max (layout children)
+(defun save-some-state (layout children)
   (declare (ignore children))
   (setf (aref (layout-scratchpad layout) 0) (layout-minimum layout)
-	(aref (layout-scratchpad layout) 1) (layout-maximum layout)))
+	(aref (layout-scratchpad layout) 1) (layout-maximum layout)
+	(aref (layout-scratchpad layout) 2) (layout-flex-value layout)
+	(aref (layout-scratchpad layout) 3) (ecase (layout-type layout)
+					      (:flex 0.0)
+					      (:fit 1.0)
+					      (:fixed 2.0))))
 
-(defun restore-min-max (layout children)
+(defun restore-state (layout children)
   (declare (ignore children))
   (setf (layout-minimum layout) (aref (layout-scratchpad layout) 0)
-	(layout-maximum layout) (aref (layout-scratchpad layout) 1)))
+	(layout-maximum layout) (aref (layout-scratchpad layout) 1)
+	(layout-flex-value layout) (aref (layout-scratchpad layout) 2)
+	(layout-type layout) (ecase (aref (layout-scratchpad layout) 3)
+			       (0.0 :flex)
+			       (1.0 :fit)
+			       (2.0 :fixed))))
 
 (defun solve-layout-tree (layout-tree)
-  (traverse-dfs #'save-min-max layout-tree)
+  (traverse-dfs #'save-some-state layout-tree)
   (traverse-reverse-dfs #'compute-fit-size  layout-tree)
   (traverse-dfs         #'compute-flex-size layout-tree)
   (traverse-dfs         #'compute-offset    layout-tree)
-  (traverse-dfs #'restore-min-max layout-tree)
+  (traverse-dfs #'restore-state layout-tree)
   layout-tree)

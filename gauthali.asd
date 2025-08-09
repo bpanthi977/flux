@@ -19,3 +19,15 @@
 				     (:file "text-entry")))
 	       (:file "screens")
                (:file "gauthali")))
+
+(asdf:defsystem #:gauthali/tests
+  :description "Tests for gauthali"
+  :author "Bibek Panthi <bpanthi977@gmail.com>"
+  :license  "MIT"
+  :version "2.0.0"
+  :serial t
+  :depends-on (#:gauthali #:fiveam)
+  :pathname "t/"
+  :components ((:file "package")
+	       (:file "utils")
+	       (:file "tests")))
