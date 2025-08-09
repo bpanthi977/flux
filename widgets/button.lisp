@@ -18,8 +18,7 @@
 	       (funcall on-press))
 	     (widget-rebuild)))))
 
-   (layout-set :flex.x :least
-	       :alignment.x :center
+   (layout-set :alignment.x :center
 	       :alignment.y :center)
    (text name))
   (:render (r x y w h)

@@ -263,8 +263,7 @@
 	   (unless (eql focus prev-focus)
 	     (widget-rebuild)))))
    (setf fg (property-get :fg-color))
-   (layout-set :flex.x :least
-	       :alignment.y :center
+   (layout-set :alignment.y :center
 	       :padding padding)
    (text-entry0 text on-change focus cursor-blink-rate))
   (:render (r x y w h)

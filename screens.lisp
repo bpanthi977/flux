@@ -7,11 +7,10 @@
   (:state (mount-time (get-internal-real-time))
 	  refresh-time)
   (:build
-   (layout-set :flex.x :least)
    (text (format nil "~,3f" (seconds-elapsed mount-time))))
   (:render (r x y w h)
-	   (declare (ignore r x y w h))
-	   (widget-rebuild)))
+   (declare (ignore r x y w h))
+   (widget-rebuild)))
 
 (defwidget home-screen ()
   (:state (text "hello world"))
