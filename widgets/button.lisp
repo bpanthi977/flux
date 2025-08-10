@@ -19,6 +19,7 @@
 	     (widget-rebuild this)))))
 
    (layout-set this
+	       :padding 2.0
 	       :alignment.x :center
 	       :alignment.y :center)
    (text name))
