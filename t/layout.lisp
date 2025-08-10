@@ -24,3 +24,14 @@
     (is (= (layout-size l1) 40.0)
 	"fit el size exceeds total child size. l1 ~a, l2 ~a"
 	(layout-size l1) (layout-size l2))))
+
+(def-test flex-max3 ()
+  "Fit containing flex in minor direction"
+  (with-layout-tree tree
+    ((column :type :fixed :size 100.0 :major-axisp nil :flex-value 1.0)
+     ((button :type :fit)
+      ((text :type :flex :maximum 50.0 :flex-value 1.0))))
+    (solve-layout-tree tree)
+    (is (= (layout-size button) 50.0)
+	"fit size ~a exceeds the max size required by flex child ~a."
+	(layout-size button) (layout-maximum text))))

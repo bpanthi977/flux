@@ -154,12 +154,15 @@ size = max size(children) [If dimension is minor aixs]"
 (defun compute-flex-size (el children)
   (if (layout-major-axisp el)
       (compute-flex-size-major el children)
-      (let ((size (- (layout-size el)
-		     (* 2 (layout-padding el)))))
-	(loop for child in children
-	      when (eql (layout-type (car child)) :flex)
+      (let ((available-size (- (layout-size el)
+			       (* 2 (layout-padding el)))))
+	(loop for node in children
+	      for child = (car node)
+	      when (eql (layout-type child) :flex)
 		do
-		   (setf (layout-size (car child)) size)))))
+		   (setf (layout-size child)
+			 (alexandria:clamp
+			  available-size (layout-minimum child) (layout-maximum child)))))))
 
 (defun compute-offset (el children)
   "Compute offset of children using parent element's offset."
