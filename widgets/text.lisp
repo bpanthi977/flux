@@ -6,30 +6,31 @@
   (:build
    ;; Compute layout ranges
    ;; no further children widgets
-   (setf font (property-get :font))
-
-   ;; Compute properties if cache is invalid
-   (when (or (not (string-equal _text text))
-	     (not (equal fg (property-get :fg-color)))
-	     (not (equal bg (property-get :bg-color)))
-	     (not (= render-scale (property-get :render-scale))))
-     (setf update t
-	   _text text
-	   bg (property-get :bg-color)
-	   fg (property-get :fg-color)
-	   render-scale (property-get :render-scale))
-     (cond ((= 0 (length _text))
-	    (setf max-width 0.0
-		  width 0.0
-		  min-height 0.0
-		  height 0.0))
-	   (t
-	    (multiple-value-bind (ret w h) (sdl3-ttf:get-string-size font text 0)
-	      (assert-ret ret)
-	      (setf max-width (/ (coerce w 'single-float) render-scale)
-		    width max-width)
-	      (setf min-height (/ (coerce h 'single-float) render-scale)
-		    height min-height)))))
+   (let ((new-font (get-font (property-get :font-manager) (property-get :font) (property-get :font-size))))
+     ;; Compute properties if cache is invalid
+     (when (or (not (eql font new-font))
+	       (not (string-equal _text text))
+	       (not (equal fg (property-get :fg-color)))
+	       (not (equal bg (property-get :bg-color)))
+	       (not (= render-scale (property-get :render-scale))))
+       (setf update t
+	     font new-font
+	     _text text
+	     bg (property-get :bg-color)
+	     fg (property-get :fg-color)
+	     render-scale (property-get :render-scale))
+       (cond ((= 0 (length _text))
+	      (setf max-width 0.0
+		    width 0.0
+		    min-height 0.0
+		    height 0.0))
+	     (t
+	      (multiple-value-bind (ret w h) (sdl3-ttf:get-string-size font text 0)
+		(assert-ret ret)
+		(setf max-width (/ (coerce w 'single-float) render-scale)
+		      width max-width)
+		(setf min-height (/ (coerce h 'single-float) render-scale)
+		      height min-height))))))
 
    (layout-set this
 	       :flex.x 1.0

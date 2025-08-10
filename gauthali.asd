@@ -11,6 +11,7 @@
 	       (:file "utils")
 	       (:file "layout")
 	       (:file "widget")
+	       (:file "font")
 	       (:module "widgets"
 			:serial t
 			:components ((:file "core")

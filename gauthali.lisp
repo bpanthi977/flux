@@ -25,18 +25,32 @@
   (widget)
   (context))
 
+(defun init-font-manager (renderer)
+  (make-instance 'font-manager
+		 :open-font-func (lambda (name size)
+				   (cond ((string-equal name "times-new-roman")
+					  (multiple-value-bind (ret sx sy) (sdl3:get-render-scale renderer)
+					    (declare (ignore sy))
+					    (assert-ret ret)
+					    (let ((font (sdl3-ttf:open-font (namestring (get-resource-path "res/fonts/Times New Roman.ttf")) (* sx size))))
+					      (assert-ret (not (cffi:null-pointer-p font)))
+					      font)))
+					 (t (error "Can't load font ~a" name))))
+		 :close-font-func #'sdl3-ttf:close-font))
+
 (defun init-ui (window renderer root-widget-symbol)
-  (let ((font (sdl3-ttf:open-font (namestring (get-resource-path "res/fonts/Times New Roman.ttf")) 24.0))
+  (let ((fm (init-font-manager renderer))
 	(context (make-context))
 	(entry (gethash root-widget-symbol *window-positions*)))
-    (assert-ret (not (cffi:null-pointer-p font)))
+
     (when entry
       (when (getf entry :size)
 	(sdl3:set-window-size window (car (getf entry :size)) (cdr (getf entry :size))))
       (when (getf entry :xy)
 	(sdl3:set-window-position window (car (getf entry :xy)) (cdr (getf entry :xy)))))
 
-    (context-set-property% context :font font)
+    (context-set-property% context :font-manager fm)
+    (context-set-property% context :font "times-new-roman")
     (context-set-property% context :font-size 24.0)
     (context-set-property% context :render-scale 1.0)
     (context-set-property% context :bg-color #(255 255 255 255))
@@ -84,8 +98,9 @@
 	   (when ui
 	     (context-set-property% context :render-scale display-scale)
 	     (sdl3:set-render-scale (ui-renderer ui) display-scale display-scale)
-	     (sdl3-ttf:set-font-size (context-get-property% context :font)
-				     (* (context-get-property% context :font-size) display-scale))
+	     (loop for font across (slot-value (context-get-property% context :font-manager) 'fonts) do
+	       (sdl3-ttf:set-font-size (font-info-ptr font)
+				       (* (font-info-size font) display-scale)))
 	     ;; Mark all widgets as dirty
 	     (widget-rebuild-all (ui-widget ui)))))
 	((:window-moved :window-resized)
@@ -145,8 +160,8 @@
       (loop for ui across uis do
 	(sdl3:destroy-renderer (ui-renderer ui))
 	(sdl3:destroy-window (ui-window ui))
-	(when (context-get-property% (ui-context ui) :font)
-	  (sdl3-ttf:close-font (context-get-property% (ui-context ui) :font))))
+	(when (context-get-property% (ui-context ui) :font-manager)
+	  (destory-font-manager (context-get-property% (ui-context ui) :font-manager))))
       ;; The window may not actually be destroyed until the event loop
       ;; is pumped again.
       (sdl3:pump-events)

@@ -113,7 +113,8 @@
 
 
    ;; Get properties
-   (let ((font (property-get :font)))
+   (let* ((fm (property-get :font-manager))
+	  (font (get-font fm (property-get :font) (property-get :font-size))))
      (setf render-scale (property-get :render-scale)
 	   fg (property-get :fg-color)
 	   bg (property-get :bg-color)
