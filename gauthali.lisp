@@ -23,7 +23,8 @@
   (renderer)
   (widget-symbol)
   (widget)
-  (context))
+  (context)
+  (debugger-render-hooks (make-hook-store)))
 
 (defun init-font-manager (renderer)
   (make-instance 'font-manager
@@ -120,6 +121,7 @@
       (setf root-widget
 	    (build-layout-render root-widget root-widget-symbol renderer context
 				 :x 0 :y 0 :w w :h h)))
+    (run-hooks (ui-debugger-render-hooks ui) (list ui))
     (sdl3:render-present renderer)
     root-widget))
 
@@ -172,4 +174,4 @@
 (defun main ()
   (trivial-main-thread:with-body-in-main-thread (:blocking t)
     (float-features:with-float-traps-masked t
-      (main0 'home-screen))))
+      (main0 'leap-year-screen))))

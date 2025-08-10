@@ -1,5 +1,23 @@
 (in-package #:gauthali)
 
+(defun make-hook-store ()
+  (list :count 0
+	:table (make-hash-table)))
+
+(defun add-hook (hook-store fn)
+  (let ((count (incf (getf hook-store :count))))
+    (setf (gethash count (getf hook-store :table)) fn)
+    count))
+
+(defun remove-hook (hook id)
+  (remhash id (getf hook :table)))
+
+(defun run-hooks (hook-store args)
+  (maphash (lambda (key value)
+	     (declare (ignore key))
+	     (apply value args))
+	   (getf hook-store :table)))
+
 (defun get-resource-path (resource)
   (asdf:system-relative-pathname :gauthali resource))
 

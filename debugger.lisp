@@ -41,6 +41,19 @@
   (:build
    (layout-set this :width width)))
 
+(defwidget hoverable (on-hover-change widget-func)
+  (:state hover)
+  (:build
+   (on sdl3:mouse-motion-event
+       (lambda (event)
+	 (multiple-value-bind (x y w h) (widget-bounds this)
+	   (let ((hovering (and (<= x (sdl3:%x event) (+ x w))
+				(<= y (sdl3:%y event) (+ y h)))))
+	     (unless (eql hover hovering)
+	       (setf hover hovering)
+	       (funcall on-hover-change hover))))))
+   (funcall widget-func)))
+
 (defwidget layout-description (widget)
   (:build
    (property-set :font-size 16.0)
@@ -49,8 +62,16 @@
     (text (format nil "~s" (layout-without-defaults (widget-layout-x widget))))
     (text (format nil "~s" (layout-without-defaults (widget-layout-y widget)))))))
 
-(defwidget ui-tree (widget)
-  (:state expanded (space/2 5.0))
+(defun highlight-widget (widget ui)
+  (let* ((r (ui-renderer ui))
+	 (lx (widget-layout-x widget))
+	 (ly (widget-layout-y widget)))
+    (set-render-draw-color r #(255 0 0 0))
+    (sdl3:render-rect r (sdl3-frect (layout-offset lx) (layout-offset ly)
+				    (layout-size lx) (layout-size ly)))))
+
+(defwidget ui-tree (widget render-hooks)
+  (:state expanded (space/2 5.0) hook-handle)
   (:build
    (when widget
      (list
@@ -58,34 +79,49 @@
       (column-widget nil
 		      (lambda ()
 			(append (list
-				 (button (symbol-name (widget-name widget))
-					 (lambda ()
-					   (setf expanded (not expanded))
-					   (widget-rebuild this))))
+				 (hoverable
+				  (lambda (hover)
+				    (when hook-handle
+				      (remove-hook render-hooks hook-handle)
+				      (setf hook-handle nil))
+				    (when hover
+				      (setf hook-handle (add-hook render-hooks
+								  (lambda (ui)
+								    (highlight-widget widget ui))))))
+				  (lambda ()
+				    (button (symbol-name (widget-name widget))
+					    (lambda ()
+					      (setf expanded (not expanded))
+					      (widget-rebuild this))))))
 				(when expanded
 				  (cons
 				   (layout-description widget)
 				   (loop for el across (widget-children widget)
-					 collect (ui-tree el))))))))))
+					 collect (ui-tree el render-hooks))))))))))
   (:render (r x y w h)
     (declare (ignorable w))
     "Render a line of left side in the hspace"
     (when expanded
       (set-render-draw-color r #(125 125 125 0))
-      (sdl3:render-line r (+ x space/2) y (+ x space/2) (+ y h)))))
+      (sdl3:render-line r (+ x space/2) y (+ x space/2) (+ y h))))
+  (:cleanup
+   (when hook-handle
+     (remove-hook render-hooks hook-handle))))
 
 (defwidget debugger ()
   (:state (selected-window))
   (:build
+   (property-set :current-ui selected-window)
    (column ()
      (row ()
        (ui-selection (lambda (s)
 		       (setf selected-window s)
 		       #+nl(let ((*print-circle* t))
-			 (print (gauthali/tests::get-layout-constructor (ui-widget selected-window) :x)))
+			     (print (gauthali/tests::get-layout-constructor (ui-widget selected-window) :x)))
 		       (widget-rebuild this))))
-     (ui-tree (when selected-window
-		(ui-widget selected-window)))))
+     (when selected-window
+       (ui-tree (ui-widget selected-window)
+		(ui-debugger-render-hooks selected-window)))))
   (:render (r w h x y)
     (declare (ignore r w h x y))
     (widget-rebuild this)))

@@ -9,7 +9,7 @@
 (defwidget row-widget (layout-args widgets-func)
   (:build
    (apply #'layout-set this layout-args)
-   (funcall widgets-func)))
+   (remove nil (funcall widgets-func))))
 
 (defmacro row ((&rest layout-args) &body widgets)
   `(row-widget (list ,@layout-args)
@@ -21,7 +21,7 @@
   (:build
    (apply #'layout-set this layout-args)
    (layout-set this :major-axis :y)
-   (funcall widgets-func)))
+   (remove nil (funcall widgets-func))))
 
 (defmacro column ((&rest layout-args) &body widgets)
   `(column-widget (list ,@layout-args)
