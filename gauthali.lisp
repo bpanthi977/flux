@@ -54,12 +54,11 @@
 			(sdl3:%window-id event)))
 	 (stop nil))
     ;; Pass to UIs
-    (loop for ui across uis
-	  with stop = nil do
-	    (if window-id
-		(when (and (not stop)
-			   (eql window-id (ui-window-id ui)))
-		  (setf stop (or stop (call-event-handlers (ui-widget ui) event))))))
+    (loop for ui across uis do
+      (if window-id
+	  (when (and (not stop)
+		     (eql window-id (ui-window-id ui)))
+	    (setf stop (or stop (call-event-handlers (ui-widget ui) event))))))
     ;; If none say stop, handle it myself
     (unless stop
       (typecase event
