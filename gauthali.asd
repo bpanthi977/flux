@@ -17,9 +17,12 @@
 			:components ((:file "core")
 				     (:file "text")
 				     (:file "button")
+				     (:file "hoverable")
 				     (:file "text-entry")))
-	       (:file "screens")
-	       (:file "debugger")
+	       (:module "screens"
+			:serial t
+			:components ((:file "home-screen")
+				     (:file "debugger-screen")))
                (:file "gauthali")))
 
 (asdf:defsystem #:gauthali/tests

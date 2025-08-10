@@ -37,23 +37,6 @@
    (set-render-draw-color r #(125 125 125 0))
    (sdl3:render-rect r (sdl3-frect x y w h))))
 
-(defwidget hspace (width)
-  (:build
-   (layout-set this :width width)))
-
-(defwidget hoverable (on-hover-change widget-func)
-  (:state hover)
-  (:build
-   (on sdl3:mouse-motion-event
-       (lambda (event)
-	 (multiple-value-bind (x y w h) (widget-bounds this)
-	   (let ((hovering (and (<= x (sdl3:%x event) (+ x w))
-				(<= y (sdl3:%y event) (+ y h)))))
-	     (unless (eql hover hovering)
-	       (setf hover hovering)
-	       (funcall on-hover-change hover))))))
-   (funcall widget-func)))
-
 (defwidget layout-description (widget)
   (:build
    (property-set :font-size 16.0)
@@ -108,7 +91,7 @@
    (when hook-handle
      (remove-hook render-hooks hook-handle))))
 
-(defwidget debugger ()
+(defwidget debugger-screen ()
   (:state (selected-window))
   (:build
    (property-set :current-ui selected-window)
@@ -116,8 +99,6 @@
      (row ()
        (ui-selection (lambda (s)
 		       (setf selected-window s)
-		       #+nl(let ((*print-circle* t))
-			     (print (gauthali/tests::get-layout-constructor (ui-widget selected-window) :x)))
 		       (widget-rebuild this))))
      (when selected-window
        (ui-tree (ui-widget selected-window)

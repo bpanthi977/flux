@@ -6,6 +6,10 @@
 	       :flex.x 1.0
 	       :flex.y 1.0)))
 
+(defwidget hspace (width)
+  (:build
+   (layout-set this :width width)))
+
 (defwidget row-widget (layout-args widgets-func)
   (:build
    (apply #'layout-set this layout-args)
