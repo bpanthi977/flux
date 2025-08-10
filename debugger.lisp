@@ -41,6 +41,14 @@
   (:build
    (layout-set this :width width)))
 
+(defwidget layout-description (widget)
+  (:build
+   (property-set :font-size 16.0)
+   (layout-set this :major-axis :y)
+   (list
+    (text (format nil "~s" (layout-without-defaults (widget-layout-x widget))))
+    (text (format nil "~s" (layout-without-defaults (widget-layout-y widget)))))))
+
 (defwidget ui-tree (widget)
   (:state expanded (space/2 5.0))
   (:build
@@ -55,13 +63,12 @@
 					   (setf expanded (not expanded))
 					   (widget-rebuild this))))
 				(when expanded
-				  (list
-				   (text (format nil "~s" (layout-without-defaults (widget-layout-x widget))))
-				   (text (format nil "~s" (layout-without-defaults (widget-layout-y widget))))))
-				(when expanded
-				  (loop for el across (widget-children widget)
-					collect (ui-tree el)))))))))
+				  (cons
+				   (layout-description widget)
+				   (loop for el across (widget-children widget)
+					 collect (ui-tree el))))))))))
   (:render (r x y w h)
+    (declare (ignorable w))
     "Render a line of left side in the hspace"
     (when expanded
       (set-render-draw-color r #(125 125 125 0))
