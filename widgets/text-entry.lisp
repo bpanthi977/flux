@@ -127,7 +127,10 @@
        (if surface
 	   (layout-set this
 		       :width.max (float (/ (cffi:foreign-slot-value surface '(:struct sdl3:surface) 'sdl3:%w) render-scale))
-		       :height.min (float (/ (cffi:foreign-slot-value surface '(:struct sdl3:surface) 'sdl3:%h) render-scale)))))
+		       :height.min (float (/ (cffi:foreign-slot-value surface '(:struct sdl3:surface) 'sdl3:%h) render-scale)))
+	   (layout-set this
+		       :width.max 0.0
+		       :height.min (/ char-height render-scale))))
 
      (layout-set this :flex.x 1.0)))
 
