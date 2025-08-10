@@ -53,7 +53,7 @@
   (:build
    ;; Handle text input events
    (on sdl3:text-input-event
-       (callback (event)
+       (lambda (event)
 	 (when focus
 	   (let* ((input-text (sdl3:%text event))
 		  (before (subseq text 0 cursor-pos))
@@ -61,11 +61,12 @@
 	     (setf text (concatenate 'string before input-text after))
 	     (incf cursor-pos (length input-text))
 	     (when on-change (funcall on-change text))
-	     (widget-rebuild this)))))
+	     (widget-rebuild this))
+	   :stop)))
 
    ;; Handle keyboard events
    (on sdl3:keyboard-event
-       (callback (event)
+       (lambda (event)
 	 (when (and focus (sdl3:%down event))
 	   (case (sdl3:%key event)
 	     ;; Backspace - delete character before cursor
@@ -107,7 +108,9 @@
 	     ;; End - move cursor to end
 	     (:end
 	      (setf cursor-pos (length text))
-	      (widget-rebuild this))))))
+	      (widget-rebuild this)))
+	   :stop)))
+
 
    ;; Get properties
    (let ((font (property-get :font)))
@@ -190,7 +193,7 @@
   (:build
 
    (on sdl3:mouse-button-event
-       (callback (event)
+       (lambda (event)
 	 (let ((prev-focus focus))
 	   (when (sdl3:%down event)
 	     (multiple-value-bind (x y w h) (widget-bounds this)

@@ -35,7 +35,7 @@
 		 :width.min (* 3 knob-radius)
                  :height.min (* 2 knob-radius))
      (on sdl3:mouse-button-event
-         (callback (event)
+         (lambda (event)
            (multiple-value-bind (x y w h) (widget-bounds this)
              (if (sdl3:%down event)
                  (when (and (<= x (sdl3:%x event) (+ x w))
@@ -46,7 +46,7 @@
                    (setf dragging nil)
                    (widget-rebuild this))))))
      (on sdl3:mouse-motion-event
-         (callback (event)
+         (lambda (event)
            (when dragging
              (update-value-from-event event))))))
   (:render (r x y w h)
