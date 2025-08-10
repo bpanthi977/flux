@@ -6,7 +6,7 @@
   :license  "MIT"
   :version "2.0.0"
   :serial t
-  :depends-on (#:sdl3 #:alexandria #:trivial-garbage #:trivial-macroexpand-all #:anaphora)
+  :depends-on (#:sdl3 #:alexandria #:trivial-garbage #:trivial-macroexpand-all #:anaphora #:closer-mop)
   :components ((:file "package")
 	       (:file "utils")
 	       (:file "layout")
@@ -18,6 +18,7 @@
 				     (:file "button")
 				     (:file "text-entry")))
 	       (:file "screens")
+	       (:file "debugger")
                (:file "gauthali")))
 
 (asdf:defsystem #:gauthali/tests
