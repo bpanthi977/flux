@@ -23,11 +23,6 @@
     (traverse-reverse-dfs fn el))
   (funcall fn (car root) (cdr root)))
 
-(defun clamp-size (el size)
-  (min (layout-maximum el)
-       (max (layout-minimum el) (coerce (min size most-positive-single-float)
-					'single-float))))
-
 (defun remaining-size (el children)
   "Space remaining in element `el' after allocating space for
 `children', padding and gap between children."
@@ -45,7 +40,12 @@ size = max size(children) [If dimension is minor aixs]"
   (unless (eql (layout-type el) :fixed)
     (setf (layout-size el) (layout-minimum el))
 
-    (labels ((accumulate (reduce-fn accessor)
+    (labels ((clamp-size (size)
+	       (min (layout-maximum el)
+		    (max (layout-minimum el) (coerce (min size most-positive-single-float)
+						     'single-float))))
+
+	     (accumulate (reduce-fn accessor)
 	       (loop for child in children
 		     for l = (car child)
 		     with acc = 0.0d0
@@ -65,10 +65,10 @@ size = max size(children) [If dimension is minor aixs]"
 		      0.0)))
 
 	     (children-max (acc)
-	       (clamp-size el (+ (total-padding) (accumulate acc #'layout-maximum))))
+	       (clamp-size (+ (total-padding) (accumulate acc #'layout-maximum))))
 
 	     (children-total (acc)
-	       (clamp-size el (+ (total-padding) (accumulate acc #'layout-size)))))
+	       (clamp-size (+ (total-padding) (accumulate acc #'layout-size)))))
 
       (if (layout-major-axisp el)
 	  ;; Major Axis

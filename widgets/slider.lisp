@@ -1,8 +1,5 @@
 (in-package #:gauthali)
 
-(defun clamp (value min max)
-  (max min (min value max)))
-
 (defun render-fill-circle (renderer cx cy radius)
   "Renders a filled circle using horizontal lines."
   (loop for dy from (- (floor radius)) to (floor radius)
@@ -18,7 +15,7 @@
             (multiple-value-bind (x y w h) (widget-bounds this)
               (declare (ignore y h))
               (let* ((track-width (- w (* 2 knob-radius)))
-                     (mouse-x-on-track (clamp (sdl3:%x event)
+                     (mouse-x-on-track (alexandria:clamp (sdl3:%x event)
                                               (+ x knob-radius)
                                               (+ x w (- knob-radius))))
                      (relative-pos (- mouse-x-on-track x knob-radius))
