@@ -242,12 +242,6 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 		   ,@build))))
        ,widget)))
 
-(defmacro layout (#.`(&rest keyword-args &key ,@*layout-set-keys*) &body widget-form)
-  (declare #.`(ignorable ,@*layout-set-keys*))
-  `(wrap-build (wrapped-widget (progn ,@widget-form))
-     (prog1 (call-original-build)
-       (layout-set wrapped-widget ,@keyword-args))))
-
 (defun recompiledp (widget)
   (not (eql (widget-version widget)
 	    (get (widget-name widget) ':gauthali.widget.version))))
@@ -372,6 +366,12 @@ Use `call-original-build' inside the `build' forms to call the original build fu
       (setf (layout-alignment x) alignment.x))
     (when alignment.y
       (setf (layout-alignment y) alignment.y))))
+
+(defmacro layout (#.`(&rest keyword-args &key ,@*layout-set-keys*) &body widget-form)
+  (declare #.`(ignorable ,@*layout-set-keys*))
+  `(wrap-build (wrapped-widget (progn ,@widget-form))
+     (prog1 (call-original-build)
+       (layout-set wrapped-widget ,@keyword-args))))
 
 (defun update-widget-layouts (widget)
   "Update layout (first X and then Y) of all the widgets rooted at
