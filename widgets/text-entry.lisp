@@ -4,14 +4,16 @@
   ((text :initarg :text)
    (texture :initform nil)
    (surface :initform nil)
+   (color :initform nil)
    (font-size :initform nil)))
 
 (defun text-cache-update-surface (cache new-text fg font)
-  (with-slots (text texture surface w h font-size) cache
+  (with-slots (text texture surface w h font-size color) cache
     (let (new-font-size)
       (when (or (not (equal text new-text))
 		(not font-size)
 		(not (= (setf new-font-size (sdl3-ttf:get-font-size font)) font-size))
+		(not (equalp color fg))
 		(null surface))
 	(setf text new-text
 	      font-size new-font-size)
@@ -125,7 +127,7 @@
        (assert-ret ret)
        (setf cursor-x (float w)))
 
-     (text-cache-update-surface texture-cache text #(0 0 0 255) font)
+     (text-cache-update-surface texture-cache text fg font)
 
      (with-slots (surface) texture-cache
        (if surface
