@@ -22,6 +22,7 @@
 	       (:module "screens"
 			:serial t
 			:components ((:file "home-screen")
+				     (:file "leap-year-screen")
 				     (:file "debugger-screen")))
                (:file "gauthali")))
 
