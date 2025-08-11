@@ -505,17 +505,7 @@ Returns :stop if any handler returned :stop, otherwise nil."
 		 :stop)))
       (rec widget))))
 
-(defun build-layout-render (prev root-widget-symbol renderer context &key x y w h)
-  "Handle the build layout and render cycle of starting at root-widget.
-
-Pass the return value of this function in previous run as the first
-argument (`prev') to maintain state and continuity. This is the
-the root-widget with all its state and children.
-
-`root-widget-symbol' is symbol whose function value denotes the root
-widget.
-
-The layout of root-widget is set as per `x', `y', `w' and `h'."
+(defun build-layout-render0 (prev root-widget-symbol renderer context x y w h)
   (let ((version (get root-widget-symbol :gauthali.widget.version nil))
 	(root-widget prev))
 
@@ -547,3 +537,19 @@ The layout of root-widget is set as per `x', `y', `w' and `h'."
     ;; Render
     (call-render-funcs root-widget renderer)
     root-widget))
+
+(defun build-layout-render (prev root-widget-symbol renderer context &key x y w h)
+  "Handle the build layout and render cycle of starting at root-widget.
+
+Pass the return value of this function in previous run as the first
+argument (`prev') to maintain state and continuity. This is the
+the root-widget with all its state and children.
+
+`root-widget-symbol' is symbol whose function value denotes the root
+widget.
+
+The layout of root-widget is set as per `x', `y', `w' and `h'."
+  (restart-case (build-layout-render0 prev root-widget-symbol renderer context x y w h)
+    (retry ()
+      :report "Retry build-layout-render phase again."
+      (build-layout-render prev root-widget-symbol renderer context :x x :y y :w w :h h))))
