@@ -43,6 +43,7 @@
 (defstruct widget
   (name nil)
   (version 0 :type fixnum)
+  (memo-if-function nil :type (or null (function (widget))))
   (build-function nil :type (or null (function (widget context))))
   (on-layout-x-function nil :type (or null (function (widget float float))))
   (on-layout-y-function nil :type (or null (function (widget float float))))
@@ -92,8 +93,48 @@
 (define-symbol-macro this
     (error "`this' is only accessible inside defwidget."))
 
+(defun destructure-body (body)
+  (let* ((decals (if (and (listp body) (listp (first body)) (eql (first (first body)) 'declare))
+		     (first body)))
+	 (body (if decals (rest body) body)))
+    (list decals body)))
+
+(defun extract-lambda-info (lambda-list)
+  "Extract variable names and call form from a lambda list."
+  (let ((vars '())
+	(call-args '())
+	(current-section :required))
+
+    (dolist (item lambda-list)
+      (cond
+	((member item '(&optional &key &rest &allow-other-keys &aux))
+	 (setf current-section item))
+
+	(t (let ((var-name (cond
+			     ((symbolp item) item)
+			     ((listp item) (first item)))))
+
+	     ;; Add to vars list (except for &allow-other-keys)
+	     (unless (eq current-section '&allow-other-keys)
+	       (push var-name vars))
+
+	     ;; Add to call args based on section
+	     (case current-section
+	       ((:required &optional)
+		(push var-name call-args))
+
+	       (&key
+		(push (intern (symbol-name var-name) :keyword) call-args)
+		(push var-name call-args))
+
+	       ;; Don't include &rest or &aux in call form for this use case
+	       )))))
+
+    (values (reverse vars)
+	    (reverse call-args))))
+
 (defun destructure-defwidget-args (args)
-  (let (state build on-layout-x on-layout-y render cleanup)
+  (let (state memo-if build on-layout-x on-layout-y render cleanup)
     (flet ((render-lambda-formp (form)
 	     (and (= 5 (length form))
 		  (every #'symbolp form)))
@@ -102,11 +143,12 @@
 		  (every #'symbolp form))))
       (loop for clause in args do
 	(cond ((or (not (listp clause))
-		   (not (member (first clause) '(:state :build :on-layout-x :on-layout-y :render :cleanup))))
-	       (error "~a not a list beginning with :state, :build, :on-layout-x, :on-layout-y, :render or :cleanup." clause))
+		   (not (member (first clause) '(:state :memo-if :build :on-layout-x :on-layout-y :render :cleanup))))
+	       (error "~a not a list beginning with :state, :memo-if, :build, :on-layout-x, :on-layout-y, :render or :cleanup." clause))
 	      (t
 	       (case (first clause)
 		 (:state (setf state (rest clause)))
+		 (:memo-if (setf memo-if (rest clause)))
 		 (:build (setf build (rest clause)))
 		 (:on-layout-x
 		  (unless (on-layout-lambda-formp (second clause))
@@ -122,7 +164,7 @@
 		  (setf render (rest clause)))
 		 (:cleanup
 		  (setf cleanup (rest clause))))))))
-    (values state build on-layout-x on-layout-y render cleanup)))
+    (values state memo-if build on-layout-x on-layout-y render cleanup)))
 
 (defun defwidget-create-lambda (args-and-body)
   (destructuring-bind (args . body) args-and-body
@@ -137,72 +179,99 @@
 
 (defmacro defwidget (name (&rest lambda-list)
 		     &body args)
-  (let ((widget (gensym "widget"))
-	(context (gensym "context"))
-	(version (1+ (get name :gauthali.widget.version -1))))
-    (setf (get name :gauthali.widget.version) version)
-    (multiple-value-bind (state build on-layout-x on-layout-y render cleanup)
+  (let* ((widget (gensym "widget"))
+	 (context (gensym "context"))
+	 (version (1+ (get name :gauthali.widget.version -1)))
+	 (widget-decals-body (destructure-body args))
+	 (widget-decals (first widget-decals-body))
+	 (args (second widget-decals-body))
+	 (lambda-vars)
+	 (lambda-call-form))
+    (multiple-value-bind (state memo-if build on-layout-x on-layout-y render cleanup)
 	(destructure-defwidget-args args)
-      (let* ((decals (if (and (listp build) (listp (first build)) (eql (first (first build)) 'declare))
-			 (first build)))
-	     (build (if decals (rest build) build))
-	     (*widget* widget)
+      (setf (values lambda-vars lambda-call-form) (extract-lambda-info lambda-list))
+      (let* ((*widget* widget)
 	     (*context* context))
-	`(defun ,name (,@lambda-list)
-	   ,decals
-	   (lambda (,widget ,context &aux (use-old (and ,widget (eql (widget-version ,widget) ,version))))
-	     (declare (ignorable ,context))
-	     ;; TODO: Create widget if necessary
-	     ;; only when :memo says so
-	     (symbol-macrolet (,@(loop for i from 0
-				       for binding in state
-				       for var = (if (listp binding) (first binding) binding)
-				       collect (list var `(aref (widget-state ,widget) ,i)))
-			       (this
-				 ,widget))
-	       (when (and ,widget
-			  (not use-old)
-			  (widget-cleanup-function ,widget))
-		 (funcall (widget-cleanup-function ,widget) ,widget))
-	       (setf ,widget (make-widget
-			      :name ',name
-			      :version ,version
-			      :dirty t
-			      :state (if use-old
-					 (widget-state ,widget)
-					 (make-array ,(length state) :initial-element nil))
-			      :children (if ,widget
-					    (widget-children ,widget)
-					    (make-array 0 :fill-pointer 0 :adjustable t))
-			      :build-function
-			      (wrap-with-widget-macros ',widget ',context
-				 (lambda (,widget ,context)
-				   (declare (ignorable ,widget ,context))
-				   (block nil
-				     ,@build)))
-			      :on-layout-x-function
-			      ,(when on-layout-x
-				 (defwidget-create-lambda on-layout-x))
+	`(progn
+	   (defun ,name (,@lambda-list)
+	     ,widget-decals
+	     (lambda (,widget ,context
+		      &aux
+			(use-old-state
+			 (and ,widget
+			      (eql (widget-version ,widget) ,version)))
+			(dont-build
+			 (and use-old-state
+			      (not (null (widget-memo-if-function ,widget)))
+			      (funcall (widget-memo-if-function ,widget) ,widget ,@lambda-call-form))))
+	       (declare (ignorable ,context))
+	       (symbol-macrolet (,@(loop for i from 0
+					 for binding in state
+					 for var = (if (listp binding) (first binding) binding)
+					 collect (list var `(aref (widget-state ,widget) ,i)))
+				 (this
+				   ,widget))
+		 (unless dont-build
+		   (when (not use-old-state)
+		     (when ,widget
+		       (when (widget-cleanup-function ,widget)
+			 (funcall (widget-cleanup-function ,widget) ,widget))))
+		   (setf ,widget (make-widget
+				  :name ',name
+				  :version ,version
+				  :dirty t
+				  :state (if use-old-state
+					     (widget-state ,widget)
+					     (make-array ,(length state) :initial-element nil))
+				  :children (if ,widget
+						(widget-children ,widget)
+						(make-array 0 :fill-pointer 0 :adjustable t))
+				  :memo-if-function
+				  ,(when memo-if
+				     (let ((lambda-vars-gensyms (loop for var in lambda-vars
+								      collect (gensym (symbol-name var)))))
+				       `(let (,@(mapcar #'list lambda-vars-gensyms lambda-vars))
+					  (declare (ignorable ,@lambda-vars-gensyms))
+					  (macrolet ((prev (sym)
+						       (unless (find sym ',lambda-vars)
+							 (error "Can't call prev on ~a.
+It is not an argument to defwidget.
+Only one of ~a is allowed inside ~a."
+								sym ',lambda-vars ',name))
+						       (nth (position sym ',lambda-vars) ',lambda-vars-gensyms)))
+					    (lambda (,widget ,@lambda-list)
+					      (declare (ignorable ,widget ,@lambda-vars))
+					      ,(trivial-macroexpand-all:macroexpand-all `(progn ,@memo-if)))))))
+				  :build-function
+				  (wrap-with-widget-macros ',widget ',context
+				    (lambda (,widget ,context)
+				      (declare (ignorable ,widget ,context))
+				      (block nil
+					,@build)))
+				  :on-layout-x-function
+				  ,(when on-layout-x
+				     (defwidget-create-lambda on-layout-x))
 
-			      :on-layout-y-function
-			      ,(when on-layout-y
-				 (defwidget-create-lambda on-layout-y))
+				  :on-layout-y-function
+				  ,(when on-layout-y
+				     (defwidget-create-lambda on-layout-y))
 
-			      :render-function
-			      ,(when render
-				 (defwidget-create-lambda render))
-			      :cleanup-function
-			      ,(when cleanup
-				 (defwidget-create-lambda `(() ,@cleanup)))))
-	       ;; Initialize variables
-	       (wrap-with-widget-macros ',widget ',context
-		 (unless use-old
-		   ,@(loop for binding in state
-			   for i from 0
-			   when (listp binding)
-			     collect `(setf ,(first binding) ,(second binding))))))
-	     ;; Return widget (the same or the newly created one)
-	     ,widget))))))
+				  :render-function
+				  ,(when render
+				     (defwidget-create-lambda render))
+				  :cleanup-function
+				  ,(when cleanup
+				     (defwidget-create-lambda `(() ,@cleanup)))))
+		   ;; Initialize variables
+		   (wrap-with-widget-macros ',widget ',context
+		     (unless use-old-state
+		       ,@(loop for binding in state
+			       for i from 0
+			       when (listp binding)
+				 collect `(setf ,(first binding) ,(second binding)))))))
+	       ;; Return widget (the same or the newly created one)
+	       ,widget))
+	   (setf (get ',name :gauthali.widget.version) ,version))))))
 
 (declaim (inline create-widget))
 (defun create-widget (widget-initializer old-widget context)
@@ -260,6 +329,7 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 		    ;; Stuff to do before calling widget-build-function
 		    (setf (fill-pointer (widget-properties widget)) 0)
 		    (setf (fill-pointer (widget-event-handlers widget)) 0)
+
 		    ;; Build the widget
 		    (setf child-widget-funcs (uiop:ensure-list (funcall (widget-build-function widget) widget context)))
 
@@ -273,6 +343,12 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 			     (let ((child-widget (create-widget child-widget-func child-old-widget context)))
 			       (update-widget-tree child-widget context)
 			       (vector-push-extend child-widget child-widgets)))
+		    ;; Destory old widget children
+		    (loop for i from (length child-widgets) below old-length
+			  for child = (aref child-widgets i) do
+			  (when (widget-cleanup-function child)
+			    (funcall (widget-cleanup-function child) child)))
+
 		    (context-restore context widget))
 
 		  (setf errored nil))
