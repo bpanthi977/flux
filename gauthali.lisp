@@ -125,7 +125,7 @@
     (sdl3:render-present renderer)
     root-widget))
 
-(defun main0 (root-widget-symbol)
+(defun main0 (root-widget-symbol &key title width height)
   ;; INIT
   (assert-ret (sdl3:init '(:video)))
   (let ((mouse-x nil)
@@ -135,7 +135,7 @@
 
     (sdl3-ttf:init)
     (multiple-value-bind (ret window renderer)
-	(sdl3:create-window-and-renderer "Leap Year" 400 200 '(:input-focus :mouse-focus :resizable :high-pixel-density))
+	(sdl3:create-window-and-renderer title width height '(:input-focus :mouse-focus :resizable :high-pixel-density))
       (assert-ret ret)
       (sdl3:raise-window window)
       (sdl3:start-text-input window)
@@ -171,7 +171,7 @@
       ;; time we create window
       (sdl3:flush-events 0 (cffi:foreign-enum-value 'sdl3:event-type :last)))))
 
-(defun main ()
+(defun start-ui (&key (widget 'leap-year-screen) (title "Leap Year") (width 400) (height 200))
   (trivial-main-thread:with-body-in-main-thread (:blocking t)
     (float-features:with-float-traps-masked t
-      (main0 'leap-year-screen))))
+      (main0 widget :title title :width (floor width) :height (floor height)))))
