@@ -199,7 +199,8 @@
 		      &aux
 			(use-old-state
 			 (and ,widget
-			      (eql (widget-version ,widget) ,version)))
+			      (eql (widget-version ,widget) ,version)
+			      (eql (widget-name ,widget) ',name)))
 			(dont-build
 			 (and use-old-state
 			      (not (null (widget-memo-if-function ,widget)))
