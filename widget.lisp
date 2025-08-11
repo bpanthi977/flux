@@ -457,7 +457,7 @@ Use `call-original-build' inside the `build' forms to call the original build fu
      (prog1 (call-original-build)
        (layout-set wrapped-widget ,@keyword-args))))
 
-(defun update-widget-layouts (widget)
+(defun update-widget-layouts (widget x y w h)
   "Update layout (first X and then Y) of all the widgets rooted at
 `widget' recursively."
   (labels ((create-tree (widget accessor)
@@ -472,6 +472,18 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 	       (loop for child across (widget-children widget)
 		     do (call-on-layout child on-layout-accessor layout-accessor)))))
 
+    ;; Set the layout of root widget
+    (when w
+      (setf (layout-type (widget-layout-x widget)) :fixed)
+      (setf (layout-size (widget-layout-x widget)) (coerce w 'single-float)))
+
+    (when h
+      (setf (layout-type (widget-layout-y widget)) :fixed)
+      (setf (layout-size (widget-layout-y widget)) (coerce h 'single-float)))
+
+    (setf (layout-offset (widget-layout-x widget)) (coerce x 'single-float))
+    (setf (layout-offset (widget-layout-y widget)) (coerce y 'single-float))
+
     ;; Layout X
     (solve-layout-tree (create-tree widget #'widget-layout-x))
     (call-on-layout widget #'widget-on-layout-x-function #'widget-layout-x)
@@ -479,13 +491,14 @@ Use `call-original-build' inside the `build' forms to call the original build fu
     (solve-layout-tree (create-tree widget #'widget-layout-y))
     (call-on-layout widget #'widget-on-layout-y-function #'widget-layout-y)))
 
-(defun call-render-funcs (widget renderer)
+(defun call-render-funcs (widget renderer &optional (offset-x 0.0) (offset-y 0.0))
   "Call all the render function of widget tree recursively."
   (labels ((rec (widget)
 	     (with-slots (render-function layout-x layout-y) widget
 	       (when render-function
 		 (funcall render-function widget renderer
-			  (layout-offset layout-x) (layout-offset layout-y)
+			  (+ offset-x (layout-offset layout-x))
+			  (+ offset-y (layout-offset layout-y))
 			  (layout-size layout-x) (layout-size layout-y)))
 	       (loop for child across (widget-children widget)
 		     do (rec child)))))
@@ -527,18 +540,8 @@ Returns :stop if any handler returned :stop, otherwise nil."
     ;; Update widget tree
     (update-widget-tree root-widget context)
 
-    ;; Set the layout of root widget
-    (setf (layout-type (widget-layout-x root-widget)) :fixed)
-    (setf (layout-type (widget-layout-y root-widget)) :fixed)
-
-    (setf (layout-size (widget-layout-x root-widget)) (coerce w 'single-float))
-    (setf (layout-size (widget-layout-y root-widget)) (coerce h 'single-float))
-
-    (setf (layout-offset (widget-layout-x root-widget)) (coerce x 'single-float))
-    (setf (layout-offset (widget-layout-y root-widget)) (coerce y 'single-float))
-
     ;; Compute layout of widget tree
-    (update-widget-layouts root-widget)
+    (update-widget-layouts root-widget x y w h)
     ;; Render
     (call-render-funcs root-widget renderer)
     root-widget))
