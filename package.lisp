@@ -7,8 +7,11 @@
    #:widget-rebuild
    #:this
    #:prev
+   #:property-set
+   #:property-get
    #:start-ui
    #:layout-set
+   #:widget-bounds
    #:create-widget
    #:destroy-widget
    #:build-context

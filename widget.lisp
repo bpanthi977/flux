@@ -76,7 +76,9 @@
 		    (error "Class ~a not found." event-class-symbol))
 		  `(progn
 		     (vector-push-extend (cons ,class ,handler) (widget-event-handlers ,,widget))
-		     nil))))
+		     nil)))
+	      (build-context ()
+		,context))
      ,@body))
 
 (defmacro property-set (property value)
