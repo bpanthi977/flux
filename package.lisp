@@ -12,12 +12,13 @@
    #:start-ui
    #:layout-set
    #:widget-bounds
-   #:create-widget
    #:destroy-widget
    #:build-context
-   #:update-widget-tree
+   #:build-widget
+   #:*context*
    #:update-widget-layouts
    #:call-render-funcs
+   #:call-event-handlers
 
    #:column
    #:column-widget

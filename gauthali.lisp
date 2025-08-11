@@ -4,12 +4,12 @@
 (defparameter *uis* nil)
 (defparameter *window-positions* (make-hash-table))
 
-(defun update-window-position (event-type window-widget &optional data1 data2)
+(defun update-window-position (event-type widget-name &optional data1 data2)
   (flet ((set-val (key val)
-	   (let ((entry (gethash window-widget *window-positions* )))
+	   (let ((entry (gethash widget-name *window-positions*)))
 	     (unless entry
 	       (setf entry (list :xy nil :size nil))
-	       (setf (gethash window-widget *window-positions*) entry))
+	       (setf (gethash widget-name *window-positions*) entry))
 	     (setf (getf entry key) val))))
     (case event-type
       (:window-moved
@@ -21,7 +21,7 @@
   (window)
   (window-id)
   (renderer)
-  (widget-symbol)
+  (widget-initializer)
   (widget)
   (context)
   (debugger-render-hooks (make-hook-store)))
@@ -39,16 +39,9 @@
 					 (t (error "Can't load font ~a" name))))
 		 :close-font-func #'sdl3-ttf:close-font))
 
-(defun init-ui (window renderer root-widget-symbol)
+(defun init-ui (window renderer root-widget-initializer)
   (let ((fm (init-font-manager renderer))
-	(context (make-context))
-	(entry (gethash root-widget-symbol *window-positions*)))
-
-    (when entry
-      (when (getf entry :size)
-	(sdl3:set-window-size window (car (getf entry :size)) (cdr (getf entry :size))))
-      (when (getf entry :xy)
-	(sdl3:set-window-position window (car (getf entry :xy)) (cdr (getf entry :xy)))))
+	(context (make-context)))
 
     (context-set-property% context :font-manager fm)
     (context-set-property% context :font "times-new-roman")
@@ -56,13 +49,23 @@
     (context-set-property% context :render-scale 1.0)
     (context-set-property% context :bg-color #(255 255 255 255))
     (context-set-property% context :fg-color #(0 0 0 255))
-    (make-ui
-     :window window
-     :window-id (sdl3:get-window-id window)
-     :renderer renderer
-     :widget-symbol root-widget-symbol
-     :widget nil
-     :context context)))
+
+    (let* ((widget (build-widget root-widget-initializer nil context))
+	   (entry (gethash (widget-name widget) *window-positions*)))
+
+      (when entry
+	(when (getf entry :size)
+	  (sdl3:set-window-size window (car (getf entry :size)) (cdr (getf entry :size))))
+	(when (getf entry :xy)
+	  (sdl3:set-window-position window (car (getf entry :xy)) (cdr (getf entry :xy)))))
+
+      (make-ui
+       :window window
+       :window-id (sdl3:get-window-id window)
+       :renderer renderer
+       :widget-initializer root-widget-initializer
+       :widget widget
+       :context context))))
 
 (defun handle-event (event uis)
   (let* ((window-id (if (slot-exists-p event 'sdl3:%window-id)
@@ -108,24 +111,36 @@
 	 (let* ((window-id (sdl3:%window-id event))
 		(ui (find window-id uis :key #'ui-window-id)))
 	   (when ui
-	     (update-window-position (sdl3:%type event) (ui-widget-symbol ui) (sdl3:%data-1 event) (sdl3:%data-2 event)))))))))
+	     (update-window-position (sdl3:%type event) (widget-name (ui-widget ui)) (sdl3:%data-1 event) (sdl3:%data-2 event)))))))))
 
-(defun update-ui (ui)
-  (with-slots (window renderer (root-widget widget) (root-widget-symbol widget-symbol) context) ui
+(defun update-ui0 (ui)
+  (with-slots (window renderer widget widget-initializer context) ui
     ;; Clear display
     (let ((bg-color (context-get-property% context :bg-color)))
       (sdl3:set-render-draw-color renderer (aref bg-color 0) (aref bg-color 1) (aref bg-color 2) (aref bg-color 3)))
     (sdl3:render-clear renderer)
+
+    ;; Build - Layout - Render
     (multiple-value-bind (ret w h) (sdl3:get-window-size window)
       (assert-ret ret)
-      (setf root-widget
-	    (build-layout-render root-widget root-widget-symbol renderer context
-				 :x 0 :y 0 :w w :h h)))
+      (setf widget (build-widget widget-initializer widget context))
+      (update-widget-layouts widget 0 0 w h)
+      (call-render-funcs widget renderer))
+
+    ;; Present
     (run-hooks (ui-debugger-render-hooks ui) (list ui))
     (sdl3:render-present renderer)
-    root-widget))
+    (values)))
 
-(defun main0 (root-widget-symbol &key title width height)
+(defun update-ui (ui)
+  (restart-case (update-ui0 ui)
+    (retry ()
+      :report "Retry updating ui again."
+      (update-ui ui))))
+
+
+
+(defun main0 (root-widget-initializer &key title width height)
   ;; INIT
   (assert-ret (sdl3:init '(:video)))
   (let ((mouse-x nil)
@@ -139,7 +154,7 @@
       (assert-ret ret)
       (sdl3:raise-window window)
       (sdl3:start-text-input window)
-      (vector-push-extend (init-ui window renderer root-widget-symbol) uis))
+      (vector-push-extend (init-ui window renderer root-widget-initializer) uis))
 
     ;; EVENT LOOP
     (unwind-protect
@@ -171,7 +186,7 @@
       ;; time we create window
       (sdl3:flush-events 0 (cffi:foreign-enum-value 'sdl3:event-type :last)))))
 
-(defun start-ui (&key (widget 'leap-year-screen) (title "Leap Year") (width 400) (height 200))
+(defun start-ui (&key (widget (row () (leap-year-screen))) (title "Leap Year") (width 400) (height 200))
   (trivial-main-thread:with-body-in-main-thread (:blocking t)
     (float-features:with-float-traps-masked t
       (main0 widget :title title :width (floor width) :height (floor height)))))

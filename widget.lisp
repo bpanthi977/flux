@@ -28,6 +28,11 @@
     (vector-push-extend value entry)
     value))
 
+(defun context-restore-property% (context property)
+  (let ((entry (gethash property (context-properties context))))
+    (when entry
+      (vector-pop entry))))
+
 (defun context-setup (context widget)
   (loop for (property . value) across (widget-properties widget)  do
     (context-set-property% context property value)))
@@ -70,14 +75,14 @@
   "Get the property value set by parent/ancestor widgets from current context."
   (context-get-property% *context* property default))
 
-(defmacro on (widget event-class-symbol handler)
+(defmacro on (event-class-symbol handler)
   "Attach an event `handler' to this `widget'.
 `event-class-symbol' is the class of event. "
   (let ((class (find-class event-class-symbol)))
     (unless class
       (error "Class ~a not found." event-class-symbol))
     `(progn
-       (vector-push-extend (cons ,class ,handler) (widget-event-handlers ,widget))
+       (vector-push-extend (cons ,class ,handler) (widget-event-handlers (context-get-property% *context* :gauthali.widget.current)))
        nil)))
 
 (define-symbol-macro this
@@ -156,13 +161,13 @@
 		  (setf cleanup (rest clause))))))))
     (values state memo-if build on-layout-x on-layout-y render cleanup)))
 
-(defun defwidget-create-lambda (args-and-body)
+(defun defwidget-create-lambda (widget args-and-body)
   (destructuring-bind (args . body) args-and-body
     (let* ((decals (if (and (listp body) (listp (first body)) (eql (first (first body)) 'declare))
 		       (first body)))
 	   (body (if decals (rest body) body)))
-      `(lambda (,*widget* ,@args)
-	 (declare (ignorable ,*widget*))
+      `(lambda (,widget ,@args)
+	 (declare (ignorable ,widget))
 	 ,decals
 	 (block nil
 	   ,@body)))))
@@ -222,18 +227,18 @@
 				    ,@build))
 				:on-layout-x-function
 				,(when on-layout-x
-				   (defwidget-create-lambda on-layout-x))
+				   (defwidget-create-lambda widget on-layout-x))
 
 				:on-layout-y-function
 				,(when on-layout-y
-				   (defwidget-create-lambda on-layout-y))
+				   (defwidget-create-lambda widget on-layout-y))
 
 				:render-function
 				,(when render
-				   (defwidget-create-lambda render))
+				   (defwidget-create-lambda widget render))
 				:cleanup-function
 				,(when cleanup
-				   (defwidget-create-lambda `(() ,@cleanup)))))
+				   (defwidget-create-lambda widget `(() ,@cleanup)))))
 		 ;; Initialize variables
 		 (unless use-old-state
 		   ,@(loop for binding in state
@@ -324,8 +329,9 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 		    (setf (fill-pointer (widget-event-handlers widget)) 0)
 
 		    ;; Build the widget
+		    (context-set-property% context :gauthali.widget.current widget)
 		    (setf child-widget-funcs (uiop:ensure-list (funcall (widget-build-function widget) widget context)))
-
+		    (context-restore-property% context :gauthali.widget.current)
 		    (context-setup context widget)
 		    ;; Update widget-children
 		    (setf (fill-pointer child-widgets) 0)
@@ -508,41 +514,7 @@ Returns :stop if any handler returned :stop, otherwise nil."
 		 :stop)))
       (rec widget))))
 
-(defun build-layout-render0 (prev root-widget-symbol renderer context x y w h)
-  (let ((version (get root-widget-symbol :gauthali.widget.version nil))
-	(root-widget prev))
-
-    ;; Initialize the root widget
-    (unless version
-      (error "~a doesn't denote a widget." root-widget-symbol))
-    (when (or (null root-widget)
-	      (not (= (widget-version root-widget) version)))
-      ;; The widget hasn't been build yet or the widget definition changed
-      (let* ((root-widget-def (symbol-function root-widget-symbol))
-	     (root-widget-initializer (funcall root-widget-def)))
-	(setf root-widget (create-widget root-widget-initializer root-widget context))))
-
-    ;; Update widget tree
-    (update-widget-tree root-widget context)
-
-    ;; Compute layout of widget tree
-    (update-widget-layouts root-widget x y w h)
-    ;; Render
-    (call-render-funcs root-widget renderer)
-    root-widget))
-
-(defun build-layout-render (prev root-widget-symbol renderer context &key x y w h)
-  "Handle the build layout and render cycle of starting at root-widget.
-
-Pass the return value of this function in previous run as the first
-argument (`prev') to maintain state and continuity. This is the
-the root-widget with all its state and children.
-
-`root-widget-symbol' is symbol whose function value denotes the root
-widget.
-
-The layout of root-widget is set as per `x', `y', `w' and `h'."
-  (restart-case (build-layout-render0 prev root-widget-symbol renderer context x y w h)
-    (retry ()
-      :report "Retry build-layout-render phase again."
-      (build-layout-render prev root-widget-symbol renderer context :x x :y y :w w :h h))))
+(defun build-widget (widget-initializer prev-instance context)
+  (let ((maybe-new-instance (create-widget widget-initializer prev-instance context)))
+    (update-widget-tree maybe-new-instance context)
+    maybe-new-instance))
