@@ -67,19 +67,18 @@
 
 (defmacro wrap-with-widget-macros (widget context &body body)
   `(macrolet ((property-set (property value)
-		`(vector-push-extend (cons ,property ,value) (widget-properties ,,widget)))
+		`(vector-push-extend (cons ,property ,value) (widget-properties ,',widget)))
 	      (property-get (property &optional default)
-		`(context-get-property% ,,context ,property ,default))
+		`(context-get-property% ,',context ,property ,default))
 	      (on (event-class-symbol handler)
 		(let ((class (find-class event-class-symbol)))
 		  (unless class
 		    (error "Class ~a not found." event-class-symbol))
 		  `(progn
-		     (vector-push-extend (cons ,class ,handler) (widget-event-handlers ,,widget))
-		     nil)))
-	      (build-context ()
-		,context))
-     ,@body))
+		     (vector-push-extend (cons ,class ,handler) (widget-event-handlers ,',widget))
+		     nil))))
+     (symbol-macrolet ((build-context ,context))
+       ,@body)))
 
 (defmacro property-set (property value)
   "Set the property value for children widgets."
@@ -231,7 +230,7 @@
 						(make-array 0 :fill-pointer 0 :adjustable t))
 				  :memo-if-function nil
 				  :build-function
-				  (wrap-with-widget-macros ',widget ',context
+				  (wrap-with-widget-macros ,widget ,context
 				    (lambda (,widget ,context)
 				      (declare (ignorable ,widget ,context))
 				      (block nil
@@ -251,7 +250,7 @@
 				  ,(when cleanup
 				     (defwidget-create-lambda `(() ,@cleanup)))))
 		   ;; Initialize variables
-		   (wrap-with-widget-macros ',widget ',context
+		   (wrap-with-widget-macros ,widget ,context
 		     (unless use-old-state
 		       ,@(loop for binding in state
 			       for i from 0
