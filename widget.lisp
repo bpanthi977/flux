@@ -59,37 +59,26 @@
   (event-handlers (make-array 0 :fill-pointer 0 :adjustable t))
   (children (make-array 0 :fill-pointer 0 :adjustable t)))
 
-(defvar *widget* nil
-  "Current Widget dynamically bound while macroexpanding defwidget.")
-
 (defvar *context* nil
-  "Current Context dynamically bound while macroexpanding defwidget.")
+  "Current Context dynamically bound while running build function of widgets.")
 
-(defmacro wrap-with-widget-macros (widget context &body body)
-  `(macrolet ((property-set (property value)
-		`(vector-push-extend (cons ,property ,value) (widget-properties ,',widget)))
-	      (property-get (property &optional default)
-		`(context-get-property% ,',context ,property ,default))
-	      (on (event-class-symbol handler)
-		(let ((class (find-class event-class-symbol)))
-		  (unless class
-		    (error "Class ~a not found." event-class-symbol))
-		  `(progn
-		     (vector-push-extend (cons ,class ,handler) (widget-event-handlers ,',widget))
-		     nil))))
-     (symbol-macrolet ((build-context ,context))
-       ,@body)))
+(defun property-set (widget property value)
+  "Set the property value that the children widgets will get in their context."
+  (vector-push-extend (cons property value) (widget-properties widget)))
 
-(defmacro property-set (property value)
-  "Set the property value for children widgets."
-  (error "property-get can be called only inside defwidget definition in :build."))
+(defun property-get (property &optional default)
+  "Get the property value set by parent/ancestor widgets from current context."
+  (context-get-property% *context* property default))
 
-(defmacro property-get (property &optional default)
-  "Get the property value set by parent/ancestor widgets."
-  (error "property-get macro can be called only inside defwidget definition in :build."))
-
-(defmacro on (event-class-symbol handler)
-  (error "on can only be called from inside defwidget in :build."))
+(defmacro on (widget event-class-symbol handler)
+  "Attach an event `handler' to this `widget'.
+`event-class-symbol' is the class of event. "
+  (let ((class (find-class event-class-symbol)))
+    (unless class
+      (error "Class ~a not found." event-class-symbol))
+    `(progn
+       (vector-push-extend (cons ,class ,handler) (widget-event-handlers ,widget))
+       nil)))
 
 (define-symbol-macro this
     (error "`this' is only accessible inside defwidget."))
@@ -181,7 +170,6 @@
 (defmacro defwidget (name (&rest lambda-list)
 		     &body args)
   (let* ((widget (gensym "widget"))
-	 (context (gensym "context"))
 	 (version (1+ (get name :gauthali.widget.version -1)))
 	 (widget-decals-body (destructure-body args))
 	 (widget-decals (first widget-decals-body))
@@ -191,92 +179,88 @@
     (multiple-value-bind (state memo-if build on-layout-x on-layout-y render cleanup)
 	(destructure-defwidget-args args)
       (setf (values lambda-vars lambda-call-form) (extract-lambda-info lambda-list))
-      (let* ((*widget* widget)
-	     (*context* context))
-	`(progn
-	   (defun ,name (,@lambda-list)
-	     ,widget-decals
-	     (lambda (,widget ,context
-		      &aux
-			(use-old-state
-			 (and ,widget
-			      (eql (widget-version ,widget) ,version)
-			      (eql (widget-name ,widget) ',name)))
-			(dont-build
-			 (and use-old-state
-			      (not (null (widget-memo-if-function ,widget)))
-			      (funcall (widget-memo-if-function ,widget) ,widget ,@lambda-call-form))))
-	       (declare (ignorable ,context))
-	       (symbol-macrolet (,@(loop for i from 0
-					 for binding in state
-					 for var = (if (listp binding) (first binding) binding)
-					 collect (list var `(aref (widget-state ,widget) ,i)))
-				 (this
-				   ,widget))
-		 (unless dont-build
-		   (when (not use-old-state)
-		     (when ,widget
-		       (when (widget-cleanup-function ,widget)
-			 (funcall (widget-cleanup-function ,widget) ,widget))))
-		   (setf ,widget (make-widget
-				  :name ',name
-				  :version ,version
-				  :dirty t
-				  :state (if use-old-state
-					     (widget-state ,widget)
-					     (make-array ,(length state) :initial-element nil))
-				  :children (if ,widget
-						(widget-children ,widget)
-						(make-array 0 :fill-pointer 0 :adjustable t))
-				  :memo-if-function nil
-				  :build-function
-				  (wrap-with-widget-macros ,widget ,context
-				    (lambda (,widget ,context)
-				      (declare (ignorable ,widget ,context))
-				      (block nil
-					,@build)))
-				  :on-layout-x-function
-				  ,(when on-layout-x
-				     (defwidget-create-lambda on-layout-x))
+      `(progn
+	 (defun ,name (,@lambda-list)
+	   ,widget-decals
+	   (lambda (,widget *context*
+		    &aux
+		      (use-old-state
+		       (and ,widget
+			    (eql (widget-version ,widget) ,version)
+			    (eql (widget-name ,widget) ',name)))
+		      (dont-build
+		       (and use-old-state
+			    (not (null (widget-memo-if-function ,widget)))
+			    (funcall (widget-memo-if-function ,widget) ,widget ,@lambda-call-form))))
+	     (declare (ignorable *context*))
+	     (symbol-macrolet (,@(loop for i from 0
+				       for binding in state
+				       for var = (if (listp binding) (first binding) binding)
+				       collect (list var `(aref (widget-state ,widget) ,i)))
+			       (this
+				 ,widget))
+	       (unless dont-build
+		 (when (not use-old-state)
+		   (when ,widget
+		     (when (widget-cleanup-function ,widget)
+		       (funcall (widget-cleanup-function ,widget) ,widget))))
+		 (setf ,widget (make-widget
+				:name ',name
+				:version ,version
+				:dirty t
+				:state (if use-old-state
+					   (widget-state ,widget)
+					   (make-array ,(length state) :initial-element nil))
+				:children (if ,widget
+					      (widget-children ,widget)
+					      (make-array 0 :fill-pointer 0 :adjustable t))
+				:memo-if-function nil
+				:build-function
+				(lambda (,widget *context*)
+				  (declare (ignorable ,widget *context*))
+				  (block nil
+				    ,@build))
+				:on-layout-x-function
+				,(when on-layout-x
+				   (defwidget-create-lambda on-layout-x))
 
-				  :on-layout-y-function
-				  ,(when on-layout-y
-				     (defwidget-create-lambda on-layout-y))
+				:on-layout-y-function
+				,(when on-layout-y
+				   (defwidget-create-lambda on-layout-y))
 
-				  :render-function
-				  ,(when render
-				     (defwidget-create-lambda render))
-				  :cleanup-function
-				  ,(when cleanup
-				     (defwidget-create-lambda `(() ,@cleanup)))))
-		   ;; Initialize variables
-		   (wrap-with-widget-macros ,widget ,context
-		     (unless use-old-state
-		       ,@(loop for binding in state
-			       for i from 0
-			       when (listp binding)
-				 collect `(setf ,(first binding) ,(second binding)))))
-		   ;; Set memo-if function
-		   ;; Has to be done after the state is initialized
-		   ,(when memo-if
-		      (let ((lambda-vars-gensyms (loop for var in lambda-vars
-						       collect (gensym (symbol-name var)))))
-			`(setf (widget-memo-if-function ,widget)
-			       (let (,@(mapcar #'list lambda-vars-gensyms lambda-vars))
-				 (declare (ignorable ,@lambda-vars-gensyms))
-				 (macrolet ((prev (sym)
-					      (unless (find sym ',lambda-vars)
-						(error "Can't call prev on ~a.
+				:render-function
+				,(when render
+				   (defwidget-create-lambda render))
+				:cleanup-function
+				,(when cleanup
+				   (defwidget-create-lambda `(() ,@cleanup)))))
+		 ;; Initialize variables
+		 (unless use-old-state
+		   ,@(loop for binding in state
+			   for i from 0
+			   when (listp binding)
+			     collect `(setf ,(first binding) ,(second binding))))
+		 ;; Set memo-if function
+		 ;; Has to be done after the state is initialized
+		 ,(when memo-if
+		    (let ((lambda-vars-gensyms (loop for var in lambda-vars
+						     collect (gensym (symbol-name var)))))
+		      `(setf (widget-memo-if-function ,widget)
+			     (let (,@(mapcar #'list lambda-vars-gensyms lambda-vars))
+			       (declare (ignorable ,@lambda-vars-gensyms))
+			       (macrolet ((prev (sym)
+					    (unless (find sym ',lambda-vars)
+					      (error "Can't call prev on ~a.
 It is not an argument to defwidget.
 Only one of ~a is allowed inside ~a."
-						       sym ',lambda-vars ',name))
-					      (nth (position sym ',lambda-vars) ',lambda-vars-gensyms)))
-				   (lambda (,widget ,@lambda-list)
-				     (declare (ignorable ,widget ,@lambda-vars))
-				     ,(trivial-macroexpand-all:macroexpand-all `(progn ,@memo-if))))))))))
-	       ;; Return widget (the same or the newly created one)
-	       ,widget))
-	   (setf (get ',name :gauthali.widget.version) ,version))))))
+						     sym ',lambda-vars ',name))
+					    (nth (position sym ',lambda-vars) ',lambda-vars-gensyms)))
+				 (lambda (,widget ,@lambda-list)
+				   (declare (ignorable ,widget ,@lambda-vars))
+				   ,(trivial-macroexpand-all:macroexpand-all `(progn ,@memo-if))))))))))
+	     ;; Return widget (the same or the newly created one)
+	     ,widget))
+	 (setf (get ',name :gauthali.widget.version) ,version)))))
 
 (declaim (inline create-widget))
 (defun create-widget (widget-initializer old-widget context)
