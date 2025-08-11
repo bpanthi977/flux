@@ -9,6 +9,12 @@
    #:prev
    #:start-ui
    #:layout-set
+   #:create-widget
+   #:destroy-widget
+   #:build-context
+   #:update-widget-tree
+   #:update-widget-layouts
+   #:call-render-funcs
 
    #:column
    #:column-widget

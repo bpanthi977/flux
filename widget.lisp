@@ -288,6 +288,10 @@ the widget. This is the widget initializer.
 `create-widget' calls that lambda with proper arguments."
   (funcall widget-initializer old-widget context))
 
+(defun destroy-widget (widget)
+  (when (widget-cleanup-function widget)
+    (funcall (widget-cleanup-function widget) widget)))
+
 (defun widget-rebuild (widget)
   (setf (widget-dirty widget) t))
 
