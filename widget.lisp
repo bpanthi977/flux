@@ -226,22 +226,7 @@
 				  :children (if ,widget
 						(widget-children ,widget)
 						(make-array 0 :fill-pointer 0 :adjustable t))
-				  :memo-if-function
-				  ,(when memo-if
-				     (let ((lambda-vars-gensyms (loop for var in lambda-vars
-								      collect (gensym (symbol-name var)))))
-				       `(let (,@(mapcar #'list lambda-vars-gensyms lambda-vars))
-					  (declare (ignorable ,@lambda-vars-gensyms))
-					  (macrolet ((prev (sym)
-						       (unless (find sym ',lambda-vars)
-							 (error "Can't call prev on ~a.
-It is not an argument to defwidget.
-Only one of ~a is allowed inside ~a."
-								sym ',lambda-vars ',name))
-						       (nth (position sym ',lambda-vars) ',lambda-vars-gensyms)))
-					    (lambda (,widget ,@lambda-list)
-					      (declare (ignorable ,widget ,@lambda-vars))
-					      ,(trivial-macroexpand-all:macroexpand-all `(progn ,@memo-if)))))))
+				  :memo-if-function nil
 				  :build-function
 				  (wrap-with-widget-macros ',widget ',context
 				    (lambda (,widget ,context)
@@ -268,7 +253,25 @@ Only one of ~a is allowed inside ~a."
 		       ,@(loop for binding in state
 			       for i from 0
 			       when (listp binding)
-				 collect `(setf ,(first binding) ,(second binding)))))))
+				 collect `(setf ,(first binding) ,(second binding)))))
+		   ;; Set memo-if function
+		   ;; Has to be done after the state is initialized
+		   ,(when memo-if
+		      (let ((lambda-vars-gensyms (loop for var in lambda-vars
+						       collect (gensym (symbol-name var)))))
+			`(setf (widget-memo-if-function ,widget)
+			       (let (,@(mapcar #'list lambda-vars-gensyms lambda-vars))
+				 (declare (ignorable ,@lambda-vars-gensyms))
+				 (macrolet ((prev (sym)
+					      (unless (find sym ',lambda-vars)
+						(error "Can't call prev on ~a.
+It is not an argument to defwidget.
+Only one of ~a is allowed inside ~a."
+						       sym ',lambda-vars ',name))
+					      (nth (position sym ',lambda-vars) ',lambda-vars-gensyms)))
+				   (lambda (,widget ,@lambda-list)
+				     (declare (ignorable ,widget ,@lambda-vars))
+				     ,(trivial-macroexpand-all:macroexpand-all `(progn ,@memo-if))))))))))
 	       ;; Return widget (the same or the newly created one)
 	       ,widget))
 	   (setf (get ',name :gauthali.widget.version) ,version))))))
