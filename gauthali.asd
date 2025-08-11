@@ -18,6 +18,7 @@
 				     (:file "text")
 				     (:file "button")
 				     (:file "hoverable")
+				     (:file "slider")
 				     (:file "text-entry")))
 	       (:module "screens"
 			:serial t

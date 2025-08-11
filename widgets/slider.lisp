@@ -28,7 +28,6 @@
 
      (layout-set this 
 		 :flex.x 1.0
-		 :flex.y 1.0
 		 :width.min (* 3 knob-radius)
                  :height.min (* 2 knob-radius))
      (on sdl3:mouse-button-event
