@@ -95,15 +95,19 @@
 (defwidget debugger-screen ()
   (:state (selected-window))
   (:build
-   (column ()
-     (row ()
-       (ui-selection (lambda (s)
-		       (setf selected-window s)
-		       (widget-rebuild this))))
-     (when selected-window
-       (ui-tree (ui-widget selected-window)
-		(ui-debugger-render-hooks selected-window)))))
    (property-set this :current-ui selected-window)
+   (scrollable
+    (lambda ()
+      (column ()
+	(row ()
+	  (ui-selection (lambda (s)
+			  (setf selected-window s)
+			  (widget-rebuild this))))
+	(when selected-window
+	  (ui-tree (ui-widget selected-window)
+		   (ui-debugger-render-hooks selected-window)))))
+    :x-speed 5.0
+    :y-speed 5.0))
   (:render (r w h x y)
     (declare (ignore r w h x y))
     (widget-rebuild this)))

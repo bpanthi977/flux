@@ -503,7 +503,7 @@ Returns :stop if any handler returned :stop, otherwise nil."
   (let ((event-class (class-of event)))
     (labels ((rec (widget)
 	       (when (or (loop for (class . handler) across (widget-event-handlers widget)
-			       for result = (when (eql event-class class)
+			       for result = (when (subtypep event-class class)
 					      (funcall handler event))
 			       when (eql result :stop)
 				 return t)

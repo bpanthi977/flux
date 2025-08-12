@@ -19,7 +19,8 @@
 				     (:file "button")
 				     (:file "hoverable")
 				     (:file "slider")
-				     (:file "text-entry")))
+				     (:file "text-entry")
+				     (:file "scrollable")))
 	       (:module "screens"
 			:serial t
 			:components ((:file "home-screen")
