@@ -22,7 +22,8 @@
    (loop for ui across *uis*
 	 collect (button (format nil "~a~a"
 				 (if (eql selected ui) "-> " "")
-				 (string (ui-widget-symbol ui)))
+				 ;; Replace with Title
+				 (string (widget-name (ui-widget ui))))
 			 (let ((copy ui))
 			   (lambda ()
 			     (funcall on-select copy)
@@ -39,7 +40,7 @@
 
 (defwidget layout-description (widget)
   (:build
-   (property-set :font-size 16.0)
+   (property-set this :font-size 16.0)
    (layout-set this :major-axis :y)
    (list
     (text (format nil "~s" (layout-without-defaults (widget-layout-x widget))))
@@ -94,7 +95,6 @@
 (defwidget debugger-screen ()
   (:state (selected-window))
   (:build
-   (property-set :current-ui selected-window)
    (column ()
      (row ()
        (ui-selection (lambda (s)
@@ -103,6 +103,7 @@
      (when selected-window
        (ui-tree (ui-widget selected-window)
 		(ui-debugger-render-hooks selected-window)))))
+   (property-set this :current-ui selected-window)
   (:render (r w h x y)
     (declare (ignore r w h x y))
     (widget-rebuild this)))

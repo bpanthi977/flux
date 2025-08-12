@@ -514,7 +514,14 @@ Returns :stop if any handler returned :stop, otherwise nil."
 		 :stop)))
       (rec widget))))
 
-(defun build-widget (widget-initializer prev-instance context)
+(defun build-widget (widget-initializer prev-instance &optional (context *context*))
   (let ((maybe-new-instance (create-widget widget-initializer prev-instance context)))
     (update-widget-tree maybe-new-instance context)
     maybe-new-instance))
+
+(defun cleanup-widget (widget)
+  "Run cleanup of code for widget and its children."
+  (when (widget-cleanup-function widget)
+    (funcall (widget-cleanup-function widget) widget))
+  (loop for child across (widget-children widget)
+	do (cleanup-widget child)))

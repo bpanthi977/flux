@@ -14,7 +14,7 @@
 			       (= parsed-length (length input-text))))
 	    (leap (and valid-number (leap-year-p year))))
        (cond ((not valid-number)
-	      (property-set :fg-color #(255 0 0 0))
+	      (property-set this :fg-color #(255 0 0 0))
 	      (text "Input is not a valid number."))
 	     ((and valid-number leap)
 	      (text "Leap year."))
@@ -23,7 +23,10 @@
 (defwidget leap-year-screen ()
   (:state (input "2024"))
   (:build
-   (layout-set this :alignment.y :center)
+   (layout-set this
+	       :alignment.y :center
+	       :flex.x 1.0
+	       :flex.y 1.0)
    (column (:alignment.x :center)
      (row (:child-gap.x 10.0)
        (row (:flex.x 1.0

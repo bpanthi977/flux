@@ -88,10 +88,10 @@
 	   (:d (when (and (member :lctrl (sdl3:%mod event))
 			  (sdl3:%down event)
 			  (not (sdl3:%repeat event))
-			  (< (count 'debugger-screen uis :key #'ui-widget-symbol) 2))
+			  (< (count 'debugger-screen uis :key (lambda (ui) (widget-name (ui-widget ui)))) 2))
 		 (multiple-value-bind (ret w r) (sdl3:create-window-and-renderer "Debugger" 200 400 '(:resizable :high-pixel-density))
 		   (assert-ret ret)
-		   (vector-push-extend (init-ui w r 'debugger-screen) uis)))))))
+		   (vector-push-extend (init-ui w r (row () (debugger-screen))) uis)))))))
 
       (case (sdl3:%type event)
 	(:window-display-scale-changed
