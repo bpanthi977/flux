@@ -25,7 +25,20 @@
   (:build
    (setf render-scale (property-get :render-scale))
    (on t (lambda (event)
-	   (call-event-handlers widget event)))
+	   (typecase event
+	     ;; Pass mouse events only if they occur inside the widget
+	     ((or sdl3:mouse-motion-event sdl3:mouse-button-event)
+	      (let ((x (sdl3:%x event))
+		    (y (sdl3:%y event)))
+		    (when (within-widget-bounds this x y)
+		      (incf (sdl3:%x event) xscroll)
+		      (incf (sdl3:%y event) yscroll)
+		      (prog1 (call-event-handlers widget event)
+			(setf (sdl3:%x event) x
+			      (sdl3:%y event) y)))))
+	     ;; Pass other events as it is
+	     (t (call-event-handlers widget event)))))
+
    (on sdl3:mouse-wheel-event
        (lambda (event)
 	 (call-event-handlers widget event)

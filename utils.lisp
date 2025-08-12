@@ -55,3 +55,8 @@
 	 ,@body
 	 (when (and (= ,sx ,sy) (not (= ,sx 1.0)))
 	   (sdl3:set-render-scale ,renderer ,sx ,sy))))))
+
+(defun within-widget-bounds (widget event-x event-y)
+  (multiple-value-bind (x y w h) (widget-bounds widget)
+    (and (<= x event-x (+ x w))
+	 (<= y event-y (+ y h)))))
