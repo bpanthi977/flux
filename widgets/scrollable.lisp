@@ -21,8 +21,9 @@
     (assert (not (cffi:null-pointer-p texture)))))
 
 (defwidget scrollable (widget-func &key (x-speed 1.0) (y-speed 1.0))
-  (:state widget (texture-cache (make-instance 'texture-cache)) (yscroll 0.0) (xscroll 0.0) (render-scale 1.0))
+  (:state widget (texture-cache (make-instance 'texture-cache)) (yscroll 0.0) (xscroll 0.0) (render-scale 1.0) bg-color)
   (:build
+   (setf bg-color (property-get :bg-color))
    (setf render-scale (property-get :render-scale))
    (on t (lambda (event)
 	   (typecase event
@@ -57,6 +58,7 @@
 	       :flex.y 1.0)
    (setf widget (build-widget (funcall widget-func) widget))
    nil)
+
   (:render (r x y w h)
      "Layout - Render"
      ;; Layout
@@ -69,6 +71,8 @@
 	 (update-texture texture-cache r (* render-scale ww) (* render-scale wh))
 	 (assert-ret (sdl3:set-render-target r (texture-cache-texture texture-cache)))
 	 (assert-ret (sdl3:set-render-scale r render-scale render-scale))
+	 (set-render-draw-color r bg-color)
+	 (sdl3:render-clear r)
 	 (call-render-funcs widget r)
 	 (assert-ret (sdl3:set-render-target r (cffi:null-pointer)))
 	 ;;(print (list x y w h ww wh yscroll))
