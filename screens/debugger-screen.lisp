@@ -78,10 +78,13 @@
 					      (setf expanded (not expanded))
 					      (widget-rebuild this))))))
 				(when expanded
-				  (cons
-				   (layout-description widget)
-				   (loop for el across (widget-children widget)
-					 collect (ui-tree el render-hooks))))))))))
+				  (cons (layout-description widget)
+					(loop for el across (widget-children widget)
+					      collect (ui-tree el render-hooks))))
+				(when (and expanded (eql (widget-name widget) 'scrollable))
+				  (loop for state-val across (widget-state widget)
+					when (widget-p state-val)
+					  collect (ui-tree state-val render-hooks)))))))))
   (:render (r x y w h)
     (declare (ignorable w))
     "Render a line of left side in the hspace"
