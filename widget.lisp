@@ -38,10 +38,8 @@
     (context-set-property% context property value)))
 
 (defun context-restore (context widget)
-  (loop for (property . value) across (widget-properties widget)
-	for entry = (gethash property (context-properties context))
-	do
-	   (vector-pop entry)))
+  (loop for (property . value) across (widget-properties widget) do
+    (context-restore-property% context property)))
 
 ;;;; WIDGET WIDGET
 
@@ -66,24 +64,6 @@
 
 (defvar *context* nil
   "Current Context dynamically bound while running build function of widgets.")
-
-(defun property-set (widget property value)
-  "Set the property value that the children widgets will get in their context."
-  (vector-push-extend (cons property value) (widget-properties widget)))
-
-(defun property-get (property &optional default)
-  "Get the property value set by parent/ancestor widgets from current context."
-  (context-get-property% *context* property default))
-
-(defmacro on (event-class-symbol handler)
-  "Attach an event `handler' to this `widget'.
-`event-class-symbol' is the class of event. "
-  (let ((class (find-class event-class-symbol)))
-    (unless class
-      (error "Class ~a not found." event-class-symbol))
-    `(progn
-       (vector-push-extend (cons ,class ,handler) (widget-event-handlers (context-get-property% *context* :gauthali.widget.current)))
-       nil)))
 
 (define-symbol-macro this
     (error "`this' is only accessible inside defwidget."))
@@ -267,6 +247,24 @@ Only one of ~a is allowed inside ~a."
 	     ,widget))
 	 (setf (get ',name :gauthali.widget.version) ,version)))))
 
+(defun property-set (widget property value)
+  "Set the property value that the children widgets will get in their context."
+  (vector-push-extend (cons property value) (widget-properties widget)))
+
+(defun property-get (property &optional default)
+  "Get the property value set by parent/ancestor widgets from current context."
+  (context-get-property% *context* property default))
+
+(defmacro on (event-class-symbol handler)
+  "Attach an event `handler' to this `widget'.
+`event-class-symbol' is the class of event. "
+  (let ((class (find-class event-class-symbol)))
+    (unless class
+      (error "Class ~a not found." event-class-symbol))
+    `(progn
+       (vector-push-extend (cons ,class ,handler) (widget-event-handlers (context-get-property% *context* :gauthali.widget.current)))
+       nil)))
+
 (declaim (inline create-widget))
 (defun create-widget (widget-initializer old-widget context)
   "Calls the widget initializer function `widget-initializer'.
@@ -278,10 +276,6 @@ the widget. This is the widget initializer.
 
 `create-widget' calls that lambda with proper arguments."
   (funcall widget-initializer old-widget context))
-
-(defun destroy-widget (widget)
-  (when (widget-cleanup-function widget)
-    (funcall (widget-cleanup-function widget) widget)))
 
 (defun widget-rebuild (widget)
   (setf (widget-dirty widget) t))
@@ -375,17 +369,8 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 				    padding padding.x padding.y
 				    child-gap child-gap.x child-gap.y
 				    alignment.x alignment.y)))
-(eval-when (:compile-toplevel :load-toplevel :execute)
-  (defparameter *layout-set-arg* `(&rest keyword-args
-					 &key ,@*layout-set-keys*)))
 
-(defun layout-set (widget
-		    &key major-axis
-		      width width.min width.max flex.x
-		      height height.min height.max flex.y
-		      padding padding.x padding.y
-		      child-gap child-gap.x child-gap.y
-		      alignment.x alignment.y)
+(defun layout-set #.`(widget &key ,@*layout-set-keys*)
   (let ((x (widget-layout-x widget))
 	(y (widget-layout-y widget)))
     (when major-axis
@@ -496,8 +481,8 @@ Use `call-original-build' inside the `build' forms to call the original build fu
     (rec widget)))
 
 (defun call-event-handlers (widget event)
-  "Find and class event handlers registered in widget tree recursively.
-Stop when the first only returns :stop.
+  "Find and call event handlers registered in widget tree recursively.
+Stop when the any of them returns :stop.
 
 Returns :stop if any handler returned :stop, otherwise nil."
   (let ((event-class (class-of event)))
@@ -515,6 +500,11 @@ Returns :stop if any handler returned :stop, otherwise nil."
       (rec widget))))
 
 (defun build-widget (widget-initializer prev-instance &optional (context *context*))
+  "Creates the widget tree from the given `widget-initializer'.
+
+If `prev-instance' is provided state is maintained between the widget
+trees if applicable, and the children widgets will only be rebuild if
+their definition has been updated or (widget-rebuild) had been called."
   (let ((maybe-new-instance (create-widget widget-initializer prev-instance context)))
     (update-widget-tree maybe-new-instance context)
     maybe-new-instance))

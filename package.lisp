@@ -12,7 +12,7 @@
    #:start-ui
    #:layout-set
    #:widget-bounds
-   #:destroy-widget
+   #:cleanup-widget
    #:build-context
    #:build-widget
    #:*context*
