@@ -1,6 +1,6 @@
 (in-package #:gauthali)
 
-(defwidget button (name on-press)
+(defwidget pressable (child-widget on-press)
   (:state pressed)
   (:build
    (on sdl3:mouse-button-event
@@ -15,14 +15,18 @@
 	       (setf pressed nil))
 	   (unless (eql old pressed)
 	     (when pressed
-	       (funcall on-press))
-	     (widget-rebuild this)))))
+	       (funcall on-press))))))
 
+   child-widget))
+
+(defwidget button (name on-press)
+  (:state pressed)
+  (:build
    (layout-set this
 	       :padding 2.0
 	       :alignment.x :center
 	       :alignment.y :center)
-   (text name))
+   (pressable (text name) on-press))
   (:render (r x y w h)
 	   (sdl3:set-render-draw-color r 125 125 125 125)
 	   (sdl3:render-rect r (make-instance 'sdl3:frect :%h h :%w w :%y y :%x x))))
