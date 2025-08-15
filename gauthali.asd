@@ -20,6 +20,7 @@
 				     (:file "hoverable")
 				     (:file "slider")
 				     (:file "text-entry")
+				     (:file "tabs")
 				     (:file "scrollable")))
 	       (:module "screens"
 			:serial t
