@@ -508,12 +508,17 @@ Returns :stop if any handler returned :stop, otherwise nil."
 (defun build-widget (widget-initializer prev-instance &optional (context *context*))
   "Creates the widget tree from the given `widget-initializer'.
 
-If `prev-instance' is provided state is maintained between the widget
-trees if applicable, and the children widgets will only be rebuild if
-their definition has been updated or (widget-rebuild) had been called."
-  (let ((maybe-new-instance (create-widget widget-initializer prev-instance context)))
-    (update-widget-tree maybe-new-instance context)
-    maybe-new-instance))
+If `prev-instance' is provided the widget won't be build, unless it is
+dirty. State is maintained between the widget trees if applicable, and
+the children widgets will be rebuild if their definition has been
+updated or (widget-rebuild) had been called."
+
+  (when (or (not prev-instance)
+	    (widget-dirty prev-instance)
+	    (some #'recompiledp (widget-children prev-instance)))
+    (setf prev-instance (create-widget widget-initializer prev-instance context)))
+  (update-widget-tree prev-instance context)
+  prev-instance)
 
 (defun cleanup-widget (widget)
   "Run cleanup of code for widget and its children."
