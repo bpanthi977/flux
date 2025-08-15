@@ -2,35 +2,32 @@
 
 
 (defwidget text (text)
-  (:state (update t) _text font surface texture fg bg render-scale max-width min-height width height)
+  (:state (update t) font surface texture fg bg render-scale max-width min-height width height)
+  (:memo-if (and (eql font (get-font (property-get :font-manager) (property-get :font) (property-get :font-size)))
+		 (string= text (prev text))
+		 (equal fg (property-get :fg-color))
+		 (equal bg (property-get :bg-color))
+		 (= render-scale (property-get :render-scale))))
   (:build
    ;; Compute layout ranges
    ;; no further children widgets
-   (let ((new-font (get-font (property-get :font-manager) (property-get :font) (property-get :font-size))))
-     ;; Compute properties if cache is invalid
-     (when (or (not (eql font new-font))
-	       (not (string-equal _text text))
-	       (not (equal fg (property-get :fg-color)))
-	       (not (equal bg (property-get :bg-color)))
-	       (not (= render-scale (property-get :render-scale))))
-       (setf update t
-	     font new-font
-	     _text text
-	     bg (property-get :bg-color)
-	     fg (property-get :fg-color)
-	     render-scale (property-get :render-scale))
-       (cond ((= 0 (length _text))
-	      (setf max-width 0.0
-		    width 0.0
-		    min-height 0.0
-		    height 0.0))
-	     (t
-	      (multiple-value-bind (ret w h) (sdl3-ttf:get-string-size font text 0)
-		(assert-ret ret)
-		(setf max-width (/ (coerce w 'single-float) render-scale)
-		      width max-width)
-		(setf min-height (/ (coerce h 'single-float) render-scale)
-		      height min-height))))))
+   (setf font (get-font (property-get :font-manager) (property-get :font) (property-get :font-size))
+	 bg (property-get :bg-color)
+	 fg (property-get :fg-color)
+	 render-scale (property-get :render-scale)
+	 update t)
+   (cond ((= 0 (length text))
+	  (setf max-width 0.0
+		width 0.0
+		min-height 0.0
+		height 0.0))
+	 (t
+	  (multiple-value-bind (ret w h) (sdl3-ttf:get-string-size font text 0)
+	    (assert-ret ret)
+	    (setf max-width (/ (coerce w 'single-float) render-scale)
+		  width max-width)
+	    (setf min-height (/ (coerce h 'single-float) render-scale)
+		  height min-height))))
 
    (layout-set this
 	       :flex.x 1.0
@@ -52,7 +49,7 @@
 		    (when surface
 		      (sdl3:destroy-surface surface)
 		      (setf surface nil))
-		    (setf surface (sdl3-ttf:render-text-lcd-wrapped font _text 0 (sdl3-color fg) (sdl3-color bg) (floor (* render-scale width)))
+		    (setf surface (sdl3-ttf:render-text-lcd-wrapped font text 0 (sdl3-color fg) (sdl3-color bg) (floor (* render-scale width)))
 			  update t)))
 
 		(layout-set this :height.min height))
