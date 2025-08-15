@@ -69,9 +69,15 @@
     (error "`this' is only accessible inside defwidget."))
 
 (defun destructure-body (body)
-  (let* ((decals (if (and (listp body) (listp (first body)) (eql (first (first body)) 'declare))
-		     (first body)))
-	 (body (if decals (rest body) body)))
+  (let (decals)
+    (when (and (listp body) (stringp (first body)))
+      (push (first body) decals)
+      (setf body (rest body)))
+    (when (and (listp body)
+	       (listp (first body))
+	       (eql (first (first body)) 'declare))
+      (push (first body) decals)
+      (setf body (rest body)))
     (list decals body)))
 
 (defun extract-lambda-info (lambda-list)
@@ -166,7 +172,7 @@
       (setf (values lambda-vars lambda-call-form) (extract-lambda-info lambda-list))
       `(progn
 	 (defun ,name (,@lambda-list)
-	   ,widget-decals
+	   ,@widget-decals
 	   (lambda (,widget *context*
 		    &aux
 		      (use-old-state
