@@ -32,3 +32,11 @@
 	       (lambda ()
 		 (list
 		  ,@widgets))))
+
+(defwidget ref (setter widget)
+  "Calls `setter' with the instance of `widget' after it is built."
+  (:build
+   (lambda (prev-instance context)
+     (let ((instance (funcall widget prev-instance context)))
+       (funcall setter instance)
+       instance))))
