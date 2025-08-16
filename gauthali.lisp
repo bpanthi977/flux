@@ -178,7 +178,8 @@
 	(sdl3:destroy-renderer (ui-renderer ui))
 	(sdl3:destroy-window (ui-window ui))
 	(when (context-get-property% (ui-context ui) :font-manager)
-	  (destory-font-manager (context-get-property% (ui-context ui) :font-manager))))
+	  (destory-font-manager (context-get-property% (ui-context ui) :font-manager)))
+	(cleanup-widget (ui-widget ui)))
       ;; The window may not actually be destroyed until the event loop
       ;; is pumped again.
       (sdl3:pump-events)
