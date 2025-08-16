@@ -44,14 +44,17 @@
 
 ;; Enhanced text entry widget using text-segment
 ;; It is single line input
-(defwidget text-entry0 (initial-text on-change focus &optional (cursor-blink-rate 1.5))
-  (:state (text initial-text)
-	  (cursor-pos (length initial-text))
-	  (texture-cache (make-instance 'text-texture-cache :text initial-text))
+
+(defwidget text-entry0 (text on-change focus &optional (cursor-blink-rate 1.5))
+  (:state (cursor-pos (length text))
+	  (texture-cache (make-instance 'text-texture-cache :text text))
 	  cursor-x
 	  render-scale
 	  fg bg char-height
 	  (cursor-last-shown 0))
+  (:memo-if (and (string= text (prev text))
+		 (eql focus (prev focus))
+		 (eql cursor-blink-rate (prev cursor-blink-rate))))
   (:build
    ;; Handle text input events
    (on sdl3:text-input-event
@@ -121,6 +124,9 @@
 	   fg (property-get :fg-color)
 	   bg (property-get :bg-color)
 	   char-height (float (sdl3-ttf:get-font-height font)))
+     ;; Make sure cursor-pos is valid
+     (setf cursor-pos (alexandria:clamp cursor-pos 0 (length text)))
+
      ;; Get cursor-x i.e. string width upto cursor-pos
      (multiple-value-bind (ret w h) (sdl3-ttf:get-string-size font (subseq text 0 cursor-pos) 0)
        (declare (ignore h))
