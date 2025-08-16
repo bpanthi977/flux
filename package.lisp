@@ -7,6 +7,7 @@
    #:widget-rebuild
    #:this
    #:prev
+   #:on
    #:property-set
    #:property-get
    #:start-ui
@@ -25,6 +26,8 @@
    #:row
    #:row-widget
    #:layout
+   #:pressable
+   #:hoverable
    #:button
    #:text
    #:text-entry
