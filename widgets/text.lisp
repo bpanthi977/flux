@@ -31,7 +31,7 @@
 
    (layout-set this
 	       :flex.x 1.0
-	       :width.min (property-get :font-size)
+	       :width.min 0.0
 	       :width.max max-width
 	       :height.min min-height)
    nil)
