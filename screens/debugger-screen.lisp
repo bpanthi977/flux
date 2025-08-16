@@ -72,11 +72,10 @@
 				      (setf hook-handle (add-hook render-hooks
 								  (lambda (ui)
 								    (highlight-widget widget ui))))))
-				  (lambda ()
-				    (button (symbol-name (widget-name widget))
-					    (lambda ()
-					      (setf expanded (not expanded))
-					      (widget-rebuild this))))))
+				  (button (symbol-name (widget-name widget))
+					  (lambda ()
+					    (setf expanded (not expanded))
+					    (widget-rebuild this)))))
 				(when expanded
 				  (cons (layout-description widget)
 					(loop for el across (widget-children widget)

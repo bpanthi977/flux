@@ -1,6 +1,6 @@
 (in-package #:gauthali)
 
-(defwidget hoverable (on-hover-change widget-func)
+(defwidget hoverable (on-hover-change widget)
   (:state hover)
   (:build
    (on sdl3:mouse-motion-event
@@ -11,4 +11,4 @@
 	     (unless (eql hover hovering)
 	       (setf hover hovering)
 	       (funcall on-hover-change hover))))))
-   (funcall widget-func)))
+   widget))
