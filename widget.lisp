@@ -60,6 +60,7 @@
   (layout-y (make-layout :major-axisp nil) :type layout)
   (properties (make-array 0 :fill-pointer 0 :adjustable t) :type vector)
   (event-handlers (make-array 0 :fill-pointer 0 :adjustable t))
+  (detach-children nil :type boolean)
   (children (make-array 0 :fill-pointer 0 :adjustable t)))
 
 (defvar *context* nil
@@ -444,8 +445,9 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 `widget' recursively."
   (labels ((create-tree (widget accessor)
 	     (cons (funcall accessor widget)
-		   (loop for child across (widget-children widget)
-			 collect (create-tree child accessor))))
+		   (unless (widget-detach-children widget)
+		     (loop for child across (widget-children widget)
+			   collect (create-tree child accessor)))))
 	   (call-on-layout (widget on-layout-accessor layout-accessor)
 	     (let ((on-layout (funcall on-layout-accessor widget))
 		   (layout (funcall layout-accessor widget)))
@@ -482,8 +484,9 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 			  (+ offset-x (layout-offset layout-x))
 			  (+ offset-y (layout-offset layout-y))
 			  (layout-size layout-x) (layout-size layout-y)))
-	       (loop for child across (widget-children widget)
-		     do (rec child)))))
+	       (unless (widget-detach-children widget)
+		 (loop for child across (widget-children widget)
+		       do (rec child))))))
     (rec widget)))
 
 (defun call-event-handlers (widget event)
@@ -498,14 +501,26 @@ Returns :stop if any handler returned :stop, otherwise nil."
 					      (funcall handler event))
 			       when (eql result :stop)
 				 return t)
-			 (loop for child across (widget-children widget)
-			       for result = (rec child)
-			       when (eql result :stop)
-				 return t))
+			 (unless (widget-detach-children widget)
+			   (loop for child across (widget-children widget)
+				 for result = (rec child)
+				 when (eql result :stop)
+				   return t)))
 		 :stop)))
       (rec widget))))
 
 (defun build-widget (widget-initializer prev-instance &optional (context *context*))
+  "Creates the widget tree from the given `widget-initializer'.
+
+If `prev-instance' is provided the state will be reused, unless it is
+dirty. State is maintained between the widget trees if applicable, and
+the children widgets will be rebuild if their definition has been
+updated or (widget-rebuild) had been called."
+  (setf prev-instance (create-widget widget-initializer prev-instance context))
+  (update-widget-tree prev-instance context)
+  prev-instance)
+
+(defun maybe-build-widget (widget-initializer prev-instance &optional (context *context*))
   "Creates the widget tree from the given `widget-initializer'.
 
 If `prev-instance' is provided the widget won't be build, unless it is

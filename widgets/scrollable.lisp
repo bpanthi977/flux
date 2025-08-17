@@ -6,7 +6,7 @@
   (height 0.0)
   (render-scale 1.0))
 
-(defmethod update-texture ((cache texture-cache) r w h)
+(defmethod update-texture-size ((cache texture-cache) r w h)
   "If necessary updates the texture to be of size w * h."
   (setf w (ceiling w)
 	h (ceiling h))
@@ -20,7 +20,7 @@
     (setf width w height h)
     (assert (not (cffi:null-pointer-p texture)))))
 
-(defwidget scrollable (widget-func &key (x-speed 1.0) (y-speed 1.0))
+(defwidget scrollable (widget-func &key (x-speed 4.0) (y-speed 4.0))
   (:state widget (texture-cache (make-instance 'texture-cache)) (yscroll 0.0) (xscroll 0.0) (render-scale 1.0) bg-color)
   (:build
    (setf bg-color (property-get :bg-color))
@@ -31,12 +31,14 @@
 	     ((or sdl3:mouse-motion-event sdl3:mouse-button-event)
 	      (let ((x (sdl3:%x event))
 		    (y (sdl3:%y event)))
-		    (when (within-widget-bounds this x y)
-		      (incf (sdl3:%x event) xscroll)
-		      (incf (sdl3:%y event) yscroll)
-		      (prog1 (call-event-handlers widget event)
-			(setf (sdl3:%x event) x
-			      (sdl3:%y event) y)))))
+		(multiple-value-bind (wx wy w h) (widget-bounds this)
+		  (when (and (<= wx x (+ wx w))
+			     (<= wy y (+ wy h)))
+		    (incf (sdl3:%x event) (- xscroll wx))
+		    (incf (sdl3:%y event) (- yscroll wy))
+		    (prog1 (call-event-handlers widget event)
+		      (setf (sdl3:%x event) x
+			    (sdl3:%y event) y))))))
 	     ;; Pass other events as it is
 	     (t (call-event-handlers widget event)))))
 
@@ -56,19 +58,20 @@
    (layout-set this
 	       :flex.x 1.0
 	       :flex.y 1.0)
-   (setf widget (build-widget (funcall widget-func) widget))
-   nil)
+   (setf (widget-detach-children this) t)
+   (ref (lambda (w) (setf widget w))
+	(funcall widget-func)))
 
   (:render (r x y w h)
      "Layout - Render"
      ;; Layout
      (layout-set widget :width.min w :height.min h)
-     (update-widget-layouts widget 0 0 nil nil)
+     (update-widget-layouts widget 0.0 0.0 nil nil)
      ;; Render to texture
      (multiple-value-bind (_x _y ww wh) (widget-bounds widget)
        (declare (ignore _x _y))
        (unless (or (= ww 0.0) (= wh 0.0))
-	 (update-texture texture-cache r (* render-scale ww) (* render-scale wh))
+	 (update-texture-size texture-cache r (* render-scale ww) (* render-scale wh))
 	 (assert-ret (sdl3:set-render-target r (texture-cache-texture texture-cache)))
 	 (assert-ret (sdl3:set-render-scale r render-scale render-scale))
 	 (set-render-draw-color r bg-color)
@@ -79,7 +82,5 @@
 	 ;; Blit the texture at appropriate location
 	 (sdl3:set-texture-scale-mode (texture-cache-texture texture-cache) :nearest)
 	 (sdl3:render-texture r (texture-cache-texture texture-cache)
-			      (make-instance 'sdl3:frect :%x 0.0 :%y (* render-scale (min wh (+ y yscroll))) :%w (* render-scale (min w ww)) :%h (* render-scale (max 0.0 (- wh yscroll))))
-			      (make-instance 'sdl3:frect :%x x :%y y :%w (min w ww) :%h (max 0.0 (- wh yscroll)))))))
-  (:cleanup
-   (cleanup-widget widget)))
+			      (make-instance 'sdl3:frect :%x 0.0 :%y (* render-scale (min wh yscroll)) :%w (* render-scale (min w ww)) :%h (* render-scale (max 0.0 (- wh yscroll))))
+			      (make-instance 'sdl3:frect :%x x :%y y :%w (min w ww) :%h (max 0.0 (- wh yscroll))))))))

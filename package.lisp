@@ -31,4 +31,5 @@
    #:button
    #:text
    #:text-entry
-   #:slider))
+   #:slider
+   #:scrollable))

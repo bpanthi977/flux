@@ -123,7 +123,7 @@
     ;; Build - Layout - Render
     (multiple-value-bind (ret w h) (sdl3:get-window-size window)
       (assert-ret ret)
-      (setf widget (build-widget widget-initializer widget context))
+      (setf widget (maybe-build-widget widget-initializer widget context))
       (update-widget-layouts widget 0 0 w h)
       (call-render-funcs widget renderer))
 
