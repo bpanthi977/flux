@@ -68,3 +68,7 @@
   (multiple-value-bind (x y w h) (widget-bounds widget)
     (and (<= x event-x (+ x w))
 	 (<= y event-y (+ y h)))))
+
+(defun get-current-font ()
+  "Get the current font from context."
+  (get-font (property-get :font-manager) (property-get :font) (property-get :font-size)))
