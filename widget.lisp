@@ -440,6 +440,11 @@ Use `call-original-build' inside the `build' forms to call the original build fu
      (prog1 (call-original-build)
        (layout-set wrapped-widget ,@keyword-args))))
 
+(defun widget-attached-children (widget)
+  "Returns the children of `widget' if they are not detached."
+  (unless (widget-detach-children widget)
+    (widget-children widget)))
+
 (defun update-widget-layouts (widget x y w h)
   "Update layout (first X and then Y) of all the widgets rooted at
 `widget' recursively."
@@ -464,10 +469,10 @@ Use `call-original-build' inside the `build' forms to call the original build fu
     (setf (layout-offset (widget-layout-y widget)) (coerce y 'single-float))
 
     ;; Layout X
-    (solve-layout-tree (map-tree #'widget-layout-x widget #'widget-children))
+    (solve-layout-tree (map-tree #'widget-layout-x widget #'widget-attached-children))
     (call-on-layout widget #'widget-on-layout-x-function #'widget-layout-x)
     ;; Layout Y
-    (solve-layout-tree (map-tree #'widget-layout-y widget #'widget-children))
+    (solve-layout-tree (map-tree #'widget-layout-y widget #'widget-attached-children))
     (call-on-layout widget #'widget-on-layout-y-function #'widget-layout-y)))
 
 (defun call-render-funcs (widget renderer &optional (offset-x 0.0) (offset-y 0.0))
