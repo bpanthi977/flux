@@ -27,17 +27,20 @@
   (debugger-render-hooks (make-hook-store)))
 
 (defun init-font-manager (renderer)
-  (make-instance 'font-manager
-		 :open-font-func (lambda (name size)
-				   (cond ((string-equal name "times-new-roman")
-					  (multiple-value-bind (ret sx sy) (sdl3:get-render-scale renderer)
-					    (declare (ignore sy))
-					    (assert-ret ret)
-					    (let ((font (sdl3-ttf:open-font (namestring (get-resource-path "res/fonts/Times New Roman.ttf")) (* sx size))))
-					      (assert-ret (not (cffi:null-pointer-p font)))
-					      font)))
-					 (t (error "Can't load font ~a" name))))
-		 :close-font-func #'sdl3-ttf:close-font))
+  (let ((text-engine (sdl3-ttf:create-renderer-text-engine renderer)))
+    (assert-ret text-engine)
+    (make-instance 'font-manager
+		   :text-engine text-engine
+		   :open-font-func (lambda (name size)
+				     (cond ((string-equal name "times-new-roman")
+					    (multiple-value-bind (ret sx sy) (sdl3:get-render-scale renderer)
+					      (declare (ignore sy))
+					      (assert-ret ret)
+					      (let ((font (sdl3-ttf:open-font (namestring (get-resource-path "res/fonts/Times New Roman.ttf")) (* sx size))))
+						(assert-ret (not (cffi:null-pointer-p font)))
+						font)))
+					   (t (error "Can't load font ~a" name))))
+		   :close-font-func #'sdl3-ttf:close-font)))
 
 (defun init-ui (window renderer root-widget-initializer)
   (let ((fm (init-font-manager renderer))
@@ -178,7 +181,8 @@
 	(sdl3:destroy-renderer (ui-renderer ui))
 	(sdl3:destroy-window (ui-window ui))
 	(when (context-get-property% (ui-context ui) :font-manager)
-	  (destory-font-manager (context-get-property% (ui-context ui) :font-manager)))
+	  (destory-font-manager (context-get-property% (ui-context ui) :font-manager))
+	  (sdl3-ttf:destroy-renderer-text-engine (get-text-engine (context-get-property% (ui-context ui) :font-manager))))
 	(cleanup-widget (ui-widget ui)))
       ;; The window may not actually be destroyed until the event loop
       ;; is pumped again.

@@ -2,12 +2,15 @@
 
 
 (defwidget text (text)
-  (:state (update t) font surface texture fg bg render-scale max-width min-height width height)
-  (:memo-if (and (eql font (get-font (property-get :font-manager) (property-get :font) (property-get :font-size)))
-		 (string= text (prev text))
-		 (equalp fg (property-get :fg-color))
-		 (equalp bg (property-get :bg-color))
-		 (= render-scale (property-get :render-scale))))
+  (:state (update t) ttf-text
+	  (text-engine (get-text-engine (property-get :font-manager)))
+	  font fg bg render-scale max-width min-height width height)
+  (:memo-if (when (and (eql font (get-font (property-get :font-manager) (property-get :font) (property-get :font-size)))
+		       (string= text (prev text))
+		       (= render-scale (property-get :render-scale)))
+	      (setf fg (property-get :fg-color))
+	      (setf bg (property-get :bg-color))
+	      t))
   (:build
    ;; Compute layout ranges
    ;; no further children widgets
@@ -42,29 +45,27 @@
 			       (not (eql width w)))
 			   (not (= 0 (length text) 0)))
 		  (setf width w)
-		  (multiple-value-bind (ret w h) (sdl3-ttf:get-string-size-wrapped font text 0 (floor (* render-scale width)))
+		  ;; Update text string
+		  (if ttf-text
+		      (sdl3-ttf:set-text-string ttf-text text 0)
+		      (setf ttf-text (sdl3-ttf:create-text text-engine font text 0)))
+		  (sdl3-ttf:set-text-wrap-width ttf-text (floor (* width render-scale)))
+		  (multiple-value-bind (ret w h) (sdl3-ttf:get-text-size ttf-text)
 		    (declare (ignore w))
 		    (assert-ret ret)
-		    (setf height (/ (coerce h 'single-float) render-scale))
-		    (when surface
-		      (sdl3:destroy-surface surface)
-		      (setf surface nil))
-		    (setf surface (sdl3-ttf:render-text-lcd-wrapped font text 0 (sdl3-color fg) (sdl3-color bg) (floor (* render-scale width)))
-			  update t)))
+		    (setf height (/ (coerce h 'single-float) render-scale))))
 
 		(layout-set this :height.min height))
 
   (:render (r x y w h)
 	   (when update
-	     (setf update nil)
-	     (when texture (sdl3:destroy-texture texture))
-	     (when surface
-	       (setf texture (sdl3:create-texture-from-surface r surface))))
-	   (when texture
-	     (with-render-scale-off r (sx sy)
-	       (sdl3:render-texture r texture nil (make-instance 'sdl3:frect :%x (* sx x) :%y (* sy y) :%w (* (min w max-width) sx) :%h (* h sy))))))
+	     (setf update nil))
+	   (set-render-draw-color r bg)
+	   (sdl3:render-fill-rect r (sdl3-frect x y w h))
+	   (with-render-scale-off r (sx sy)
+	     (sdl3-ttf:set-text-color ttf-text (aref fg 0) (aref fg 1) (aref fg 2) (aref fg 3))
+	     (sdl3-ttf:draw-renderer-text ttf-text (* sx x) (* sy y))))
+
   (:cleanup
-   (when texture
-     (sdl3:destroy-texture texture))
-   (when surface
-     (sdl3:destroy-surface surface))))
+   (when ttf-text
+     (sdl3-ttf:destroy-text ttf-text))))

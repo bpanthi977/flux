@@ -8,7 +8,8 @@
 (defclass font-manager ()
   ((open-font-func :initarg :open-font-func)
    (close-font-func :initarg :close-font-func)
-   (fonts :initform (make-array 0 :element-type 'font-info :fill-pointer 0 :adjustable t))))
+   (fonts :initform (make-array 0 :element-type 'font-info :fill-pointer 0 :adjustable t))
+   (text-engine :initarg :text-engine)))
 
 (defun find-font (fonts name size)
   (declare (type (vector font-info) fonts))
@@ -29,6 +30,9 @@
 				     :size size))
 	  (vector-push-extend font fonts)))
       (font-info-ptr font))))
+
+(defmethod get-text-engine ((fm font-manager))
+  (slot-value fm 'text-engine))
 
 (defmethod destory-font-manager ((fm font-manager))
   (with-slots (fonts close-font-func) fm
