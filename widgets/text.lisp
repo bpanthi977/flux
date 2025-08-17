@@ -5,8 +5,8 @@
   (:state (update t) font surface texture fg bg render-scale max-width min-height width height)
   (:memo-if (and (eql font (get-font (property-get :font-manager) (property-get :font) (property-get :font-size)))
 		 (string= text (prev text))
-		 (equal fg (property-get :fg-color))
-		 (equal bg (property-get :bg-color))
+		 (equalp fg (property-get :fg-color))
+		 (equalp bg (property-get :bg-color))
 		 (= render-scale (property-get :render-scale))))
   (:build
    ;; Compute layout ranges
