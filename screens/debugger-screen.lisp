@@ -61,29 +61,28 @@
      (list
       (hspace (* 2 space/2))
       (column-widget nil
-		      (lambda ()
-			(append (list
-				 (hoverable
-				  (lambda (hover)
-				    (when hook-handle
-				      (remove-hook render-hooks hook-handle)
-				      (setf hook-handle nil))
-				    (when hover
-				      (setf hook-handle (add-hook render-hooks
-								  (lambda (ui)
-								    (highlight-widget widget ui))))))
-				  (button (symbol-name (widget-name widget))
-					  (lambda ()
-					    (setf expanded (not expanded))
-					    (widget-rebuild this)))))
-				(when expanded
-				  (cons (layout-description widget)
-					(loop for el across (widget-children widget)
-					      collect (ui-tree el render-hooks))))
-				(when (and expanded (eql (widget-name widget) 'scrollable))
-				  (loop for state-val across (widget-state widget)
-					when (widget-p state-val)
-					  collect (ui-tree state-val render-hooks)))))))))
+		     (append (list
+			      (hoverable
+			       (lambda (hover)
+				 (when hook-handle
+				   (remove-hook render-hooks hook-handle)
+				   (setf hook-handle nil))
+				 (when hover
+				   (setf hook-handle (add-hook render-hooks
+							       (lambda (ui)
+								 (highlight-widget widget ui))))))
+			       (button (symbol-name (widget-name widget))
+				       (lambda ()
+					 (setf expanded (not expanded))
+					 (widget-rebuild this)))))
+			     (when expanded
+			       (cons (layout-description widget)
+				     (loop for el across (widget-children widget)
+					   collect (ui-tree el render-hooks))))
+			     (when (and expanded (eql (widget-name widget) 'scrollable))
+			       (loop for state-val across (widget-state widget)
+				     when (widget-p state-val)
+				       collect (ui-tree state-val render-hooks))))))))
   (:render (r x y w h)
     (declare (ignorable w))
     "Render a line of left side in the hspace"
@@ -99,15 +98,14 @@
   (:build
    (property-set this :current-ui selected-window)
    (scrollable
-    (lambda ()
-      (column ()
-	(row ()
-	  (ui-selection (lambda (s)
-			  (setf selected-window s)
-			  (widget-rebuild this))))
-	(when selected-window
-	  (ui-tree (ui-widget selected-window)
-		   (ui-debugger-render-hooks selected-window)))))
+    (column ()
+      (row ()
+	(ui-selection (lambda (s)
+			(setf selected-window s)
+			(widget-rebuild this))))
+      (when selected-window
+	(ui-tree (ui-widget selected-window)
+		 (ui-debugger-render-hooks selected-window))))
     :x-speed 5.0
     :y-speed 5.0))
   (:render (r w h x y)

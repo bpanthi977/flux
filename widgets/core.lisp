@@ -10,28 +10,26 @@
   (:build
    (layout-set this :width width)))
 
-(defwidget row-widget (layout-args widgets-func)
+(defwidget row-widget (layout-args widgets)
   (:build
    (apply #'layout-set this layout-args)
-   (remove nil (funcall widgets-func))))
+   (remove nil widgets)))
 
 (defmacro row ((&rest layout-args) &body widgets)
   `(row-widget (list ,@layout-args)
-	       (lambda ()
-		 (list
-		  ,@widgets))))
+	       (list
+		,@widgets)))
 
-(defwidget column-widget (layout-args widgets-func)
+(defwidget column-widget (layout-args widgets)
   (:build
    (apply #'layout-set this layout-args)
    (layout-set this :major-axis :y)
-   (remove nil (funcall widgets-func))))
+   (remove nil widgets)))
 
 (defmacro column ((&rest layout-args) &body widgets)
   `(column-widget (list ,@layout-args)
-	       (lambda ()
-		 (list
-		  ,@widgets))))
+		  (list
+		   ,@widgets)))
 
 (defwidget ref (setter widget)
   "Calls `setter' with the instance of `widget' after it is built."

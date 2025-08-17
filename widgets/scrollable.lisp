@@ -20,7 +20,7 @@
     (setf width w height h)
     (assert (not (cffi:null-pointer-p texture)))))
 
-(defwidget scrollable (widget-func &key (x-speed 4.0) (y-speed 4.0))
+(defwidget scrollable (widget-initializer &key (x-speed 4.0) (y-speed 4.0))
   (:state widget (texture-cache (make-instance 'texture-cache)) (yscroll 0.0) (xscroll 0.0) (render-scale 1.0) bg-color)
   (:build
    (setf bg-color (property-get :bg-color))
@@ -60,7 +60,7 @@
 	       :flex.y 1.0)
    (setf (widget-detach-children this) t)
    (ref (lambda (w) (setf widget w))
-	(funcall widget-func)))
+	widget-initializer))
 
   (:render (r x y w h)
      "Layout - Render"
