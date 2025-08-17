@@ -29,13 +29,12 @@
     (create-tree tree)))
 
 (defun get-layout-constructor (w axis)
-  (labels ((create-tree (widget accessor)
-	   (cons (cons (widget-name widget) (layout-without-defaults (funcall accessor widget)))
-		 (loop for child across (widget-children widget)
-		       collect (create-tree child accessor)))))
+  (flet ((map-fn (accessor)
+	   (lambda (widget)
+	     (cons (widget-name widget) (layout-without-defaults (funcall accessor widget))))))
     (ecase axis
-      (:x (create-tree w #'widget-layout-x))
-      (:y (create-tree w #'widget-layout-y)))))
+      (:x (map-tree (map-fn #'widget-layout-x) w #'widget-children))
+      (:y (map-tree (map-fn #'widget-layout-y) w #'widget-children)))))
 
 
 (defmacro with-layout-tree (tree-var tree &body body)

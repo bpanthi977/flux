@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:gauthali/utils)
 
 (defun make-hook-store ()
   (list :count 0
@@ -55,6 +55,14 @@
 	 ,@body
 	 (when (and (= ,sx ,sy) (not (= ,sx 1.0)))
 	   (sdl3:set-render-scale ,renderer ,sx ,sy))))))
+
+(defun map-tree (map-function tree children-function)
+  (labels ((rec (el)
+	     (cons (funcall map-function el)
+		   (map 'list #'rec (funcall children-function el)))))
+    (rec tree)))
+
+(in-package #:gauthali)
 
 (defun within-widget-bounds (widget event-x event-y)
   (multiple-value-bind (x y w h) (widget-bounds widget)

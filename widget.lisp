@@ -443,12 +443,7 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 (defun update-widget-layouts (widget x y w h)
   "Update layout (first X and then Y) of all the widgets rooted at
 `widget' recursively."
-  (labels ((create-tree (widget accessor)
-	     (cons (funcall accessor widget)
-		   (unless (widget-detach-children widget)
-		     (loop for child across (widget-children widget)
-			   collect (create-tree child accessor)))))
-	   (call-on-layout (widget on-layout-accessor layout-accessor)
+  (labels ((call-on-layout (widget on-layout-accessor layout-accessor)
 	     (let ((on-layout (funcall on-layout-accessor widget))
 		   (layout (funcall layout-accessor widget)))
 	       (when on-layout
@@ -469,10 +464,10 @@ Use `call-original-build' inside the `build' forms to call the original build fu
     (setf (layout-offset (widget-layout-y widget)) (coerce y 'single-float))
 
     ;; Layout X
-    (solve-layout-tree (create-tree widget #'widget-layout-x))
+    (solve-layout-tree (map-tree #'widget-layout-x widget #'widget-children))
     (call-on-layout widget #'widget-on-layout-x-function #'widget-layout-x)
     ;; Layout Y
-    (solve-layout-tree (create-tree widget #'widget-layout-y))
+    (solve-layout-tree (map-tree #'widget-layout-y widget #'widget-children))
     (call-on-layout widget #'widget-on-layout-y-function #'widget-layout-y)))
 
 (defun call-render-funcs (widget renderer &optional (offset-x 0.0) (offset-y 0.0))

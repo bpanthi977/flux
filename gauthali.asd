@@ -39,4 +39,4 @@
   :pathname "t/"
   :components ((:file "package")
 	       (:file "utils")
-	       (:file "tests")))
+	       (:file "layout")))

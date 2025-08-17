@@ -1,7 +1,23 @@
 ;;;; package.lisp
 
-(defpackage #:gauthali
+(defpackage #:gauthali/utils
   (:use #:cl)
+  (:export
+   #:make-hook-store
+   #:add-hook
+   #:remove-hook
+   #:run-hooks
+   #:get-resource-path
+   #:assert-ret
+   #:sdl3-color
+   #:sdl3-rect
+   #:sdl3-frect
+   #:set-render-draw-color
+   #:with-render-scale-off
+   #:map-tree))
+
+(defpackage #:gauthali
+  (:use #:cl #:gauthali/utils)
   (:export
    #:defwidget
    #:widget-rebuild

@@ -1,5 +1,5 @@
 (defpackage #:gauthali/tests
-  (:use #:cl #:gauthali #:fiveam)
+  (:use #:cl #:gauthali #:gauthali/utils #:fiveam)
   (:local-nicknames (#:g #:gauthali)))
 
 (in-package #:gauthali/tests)
