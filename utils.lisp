@@ -72,3 +72,13 @@
 (defun get-current-font ()
   "Get the current font from context."
   (get-font (property-get :font-manager) (property-get :font) (property-get :font-size)))
+
+(defun traverse-widget-tree (widget path)
+  "Path is a string of names and numbers separated by a ."
+  (loop for component in (uiop:split-string path :separator ".")
+	for children = (widget-children widget) do
+    (cond ((every #'digit-char-p component)
+	   (setf widget (aref children (parse-integer component))))
+	  (t
+	   (setf widget (find component children :key #'widget-name :test #'string-equal)))))
+  widget)
