@@ -14,7 +14,7 @@
 			       (= parsed-length (length input-text))))
 	    (leap (and valid-number (leap-year-p year))))
        (cond ((not valid-number)
-	      (property-set this :fg-color #(255 0 0 0))
+	      (property-set this :fg-color #(255 0 0 255))
 	      (text "Input is not a valid number."))
 	     ((and valid-number leap)
 	      (text "Leap year."))
