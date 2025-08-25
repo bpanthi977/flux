@@ -46,6 +46,7 @@
   (let ((fm (init-font-manager renderer))
 	(context (make-context)))
 
+    (context-set-property% context :sdl3.window window)
     (context-set-property% context :font-manager fm)
     (context-set-property% context :font "times-new-roman")
     (context-set-property% context :font-size 24.0)

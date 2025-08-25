@@ -21,7 +21,8 @@
 				     (:file "slider")
 				     (:file "text-entry")
 				     (:file "tabs")
-				     (:file "scrollable")))
+				     (:file "scrollable")
+				     (:file "select-file")))
 	       (:module "screens"
 			:serial t
 			:components ((:file "home-screen")

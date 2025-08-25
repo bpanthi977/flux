@@ -7,6 +7,9 @@
    #:add-hook
    #:remove-hook
    #:run-hooks
+   #:register-callback
+   #:remove-callback
+   #:get-callback
    #:get-resource-path
    #:assert-ret
    #:sdl3-color
@@ -48,4 +51,5 @@
    #:text
    #:text-entry
    #:slider
-   #:scrollable))
+   #:scrollable
+   #:select-file))

@@ -18,6 +18,22 @@
 	     (apply value args))
 	   (getf hook-store :table)))
 
+(defparameter *callbacks* (list :count 0
+				:table (make-hash-table))
+  "A way to associate callback functions with integers.
+Usefull in callbacks passed to C side.")
+
+(defun register-callback (callback)
+  (let ((id (incf (getf *callbacks* :count))))
+    (setf (gethash id (getf *callbacks* :table)) callback)
+    id))
+
+(defun remove-callback (id)
+  (remhash id (getf *callbacks* :table)))
+
+(defun get-callback (id)
+  (gethash id (getf *callbacks* :table)))
+
 (defun get-resource-path (resource)
   (asdf:system-relative-pathname :gauthali resource))
 
