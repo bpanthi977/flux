@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defstruct texture-cache
   (texture nil)

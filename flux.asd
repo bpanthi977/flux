@@ -1,10 +1,10 @@
 ;;;; gauthali.asd
 
-(asdf:defsystem #:gauthali
-  :description "Play music in sync"
+(asdf:defsystem #:flux
+  :description "UI Framework for Common Lisp"
   :author "Bibek Panthi <bpanthi977@gmail.com>"
   :license  "MIT"
-  :version "2.0.0"
+  :version "0.0.1"
   :serial t
   :depends-on (#:sdl3 #:alexandria #:trivial-garbage #:trivial-macroexpand-all #:anaphora #:closer-mop)
   :components ((:file "package")
@@ -28,15 +28,15 @@
 			:components ((:file "home-screen")
 				     (:file "leap-year-screen")
 				     (:file "debugger-screen")))
-               (:file "gauthali")))
+               (:file "flux")))
 
-(asdf:defsystem #:gauthali/tests
-  :description "Tests for gauthali"
+(asdf:defsystem #:flux/tests
+  :description "Tests for Flux"
   :author "Bibek Panthi <bpanthi977@gmail.com>"
   :license  "MIT"
-  :version "2.0.0"
+  :version "0.0.1"
   :serial t
-  :depends-on (#:gauthali #:fiveam)
+  :depends-on (#:flux #:fiveam)
   :pathname "t/"
   :components ((:file "package")
 	       (:file "utils")

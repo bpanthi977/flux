@@ -1,5 +1,5 @@
 (require 'sdl3)
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defparameter *uis* nil)
 (defparameter *window-positions* (make-hash-table))

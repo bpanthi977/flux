@@ -1,4 +1,4 @@
-(in-package :gauthali)
+(in-package :flux)
 
 (defstruct layout
   (type :fit :type (member :fit :flex :fixed))

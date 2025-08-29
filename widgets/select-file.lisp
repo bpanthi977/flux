@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 (cffi:defcallback file-select-callback :void ((user-data :pointer) (filelist (:pointer :string)) (filter :int))
   (declare (ignore filter))

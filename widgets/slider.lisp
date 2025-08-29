@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defun render-fill-circle (renderer cx cy radius)
   "Renders a filled circle using horizontal lines."

@@ -1,8 +1,8 @@
 ;;;; benchmark-app.lisp
-(defpackage #:gauthali/benchmark
-  (:use #:cl #:gauthali))
+(defpackage #:flux/benchmark
+  (:use #:cl #:flux))
 
-(in-package #:gauthali/benchmark)
+(in-package #:flux/benchmark)
 
 (defwidget rainbow-button (i j)
   (:state (r (random 255)) (g (random 255)) (b (random 255)) (hover nil))

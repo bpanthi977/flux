@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 ;;; CONTEXT
 
@@ -162,7 +162,7 @@
 (defmacro defwidget (name (&rest lambda-list)
 		     &body args)
   (let* ((widget (gensym "widget"))
-	 (version (1+ (get name :gauthali.widget.version -1)))
+	 (version (1+ (get name :flux.widget.version -1)))
 	 (widget-decals-body (destructure-body args))
 	 (widget-decals (first widget-decals-body))
 	 (args (second widget-decals-body))
@@ -252,7 +252,7 @@ Only one of ~a is allowed inside ~a."
 				   ,(trivial-macroexpand-all:macroexpand-all `(progn ,@memo-if))))))))))
 	     ;; Return widget (the same or the newly created one)
 	     ,widget))
-	 (setf (get ',name :gauthali.widget.version) ,version)))))
+	 (setf (get ',name :flux.widget.version) ,version)))))
 
 (defun property-set (widget property value)
   "Set the property value that the children widgets will get in their context."
@@ -269,7 +269,7 @@ Only one of ~a is allowed inside ~a."
     (unless class
       (error "Class ~a not found." event-class-symbol))
     `(progn
-       (vector-push-extend (cons ,class ,handler) (widget-event-handlers (context-get-property% *context* :gauthali.widget.current)))
+       (vector-push-extend (cons ,class ,handler) (widget-event-handlers (context-get-property% *context* :flux.widget.current)))
        nil)))
 
 (declaim (inline create-widget))
@@ -312,7 +312,7 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 
 (defun recompiledp (widget)
   (not (eql (widget-version widget)
-	    (get (widget-name widget) ':gauthali.widget.version))))
+	    (get (widget-name widget) ':flux.widget.version))))
 
 (defun update-widget-tree (widget context)
   (cond ((or (widget-dirty widget)
@@ -330,9 +330,9 @@ Use `call-original-build' inside the `build' forms to call the original build fu
 		    (setf (fill-pointer (widget-event-handlers widget)) 0)
 
 		    ;; Build the widget
-		    (context-set-property% context :gauthali.widget.current widget)
+		    (context-set-property% context :flux.widget.current widget)
 		    (setf child-widget-funcs (uiop:ensure-list (funcall (widget-build-function widget) widget context)))
-		    (context-restore-property% context :gauthali.widget.current)
+		    (context-restore-property% context :flux.widget.current)
 		    (context-setup context widget)
 		    ;; Update widget-children
 		    (setf (fill-pointer child-widgets) 0)

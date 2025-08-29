@@ -1,4 +1,4 @@
-(in-package #:gauthali/utils)
+(in-package #:flux/utils)
 
 (defun make-hook-store ()
   (list :count 0
@@ -35,7 +35,7 @@ Usefull in callbacks passed to C side.")
   (gethash id (getf *callbacks* :table)))
 
 (defun get-resource-path (resource)
-  (asdf:system-relative-pathname :gauthali resource))
+  (asdf:system-relative-pathname :flux resource))
 
 (defun assert-ret (return-value)
   (when (null return-value)
@@ -78,7 +78,7 @@ Usefull in callbacks passed to C side.")
 		   (map 'list #'rec (funcall children-function el)))))
     (rec tree)))
 
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defun within-widget-bounds (widget event-x event-y)
   (multiple-value-bind (x y w h) (widget-bounds widget)

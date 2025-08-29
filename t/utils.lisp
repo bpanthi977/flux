@@ -1,4 +1,4 @@
-(in-package #:gauthali/tests)
+(in-package #:flux/tests)
 
 (defmacro create-tree (tree)
   (labels ((rec (tree)

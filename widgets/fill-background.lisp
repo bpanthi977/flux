@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defwidget fill-background-widget (widgets-func)
   (:state color)

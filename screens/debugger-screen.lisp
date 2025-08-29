@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defun layout-without-defaults (obj)
   (let* ((class (find-class 'layout)))

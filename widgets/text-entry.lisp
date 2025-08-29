@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defclass text-texture-cache ()
   ((text :initarg :text)

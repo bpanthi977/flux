@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defwidget tabs-header (label-widgets on-change)
   "`label-widgets' are a list of tab labels. When one of them is clicked

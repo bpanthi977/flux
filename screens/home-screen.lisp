@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defun seconds-elapsed (since)
   (* 1.0 (- (get-internal-real-time) since) (/ internal-time-units-per-second)))

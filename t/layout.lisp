@@ -1,4 +1,4 @@
-(in-package #:gauthali/tests)
+(in-package #:flux/tests)
 
 (def-suite layout
   :description "Tests the layout engine: layout.lisp")

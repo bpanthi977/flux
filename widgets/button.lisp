@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defwidget pressable (child-widget on-press &key on-press-down)
   (:state pressed)

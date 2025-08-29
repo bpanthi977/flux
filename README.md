@@ -1,6 +1,8 @@
-# gauthali
+# FLUX
 
-Share your playlist and play in sync.
+FLUX is a UI framework for Common Lisp.
+
+Currently SDL3 is used as backend.
 
 ## License
 

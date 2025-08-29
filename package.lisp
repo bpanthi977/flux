@@ -1,6 +1,6 @@
 ;;;; package.lisp
 
-(defpackage #:gauthali/utils
+(defpackage #:flux/utils
   (:use #:cl)
   (:export
    #:make-hook-store
@@ -19,8 +19,8 @@
    #:with-render-scale-off
    #:map-tree))
 
-(defpackage #:gauthali
-  (:use #:cl #:gauthali/utils)
+(defpackage #:flux
+  (:use #:cl #:flux/utils)
   (:export
    #:defwidget
    #:widget-rebuild

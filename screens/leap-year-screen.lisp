@@ -1,4 +1,4 @@
-(in-package #:gauthali)
+(in-package #:flux)
 
 (defun leap-year-p (year)
   (and (= (mod year 4) 0)
